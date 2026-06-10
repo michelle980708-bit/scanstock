@@ -13,10 +13,7 @@
             padding: 16px;
             color: #1f2937;
         }
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
+        .container { max-width: 700px; margin: 0 auto; }
         .card {
             background: white;
             border-radius: 20px;
@@ -56,11 +53,7 @@
             color: #3b82f6;
         }
         .btn-outline:active { background: #eff6ff; }
-        .flex-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
+        .flex-row { display: flex; gap: 12px; flex-wrap: wrap; }
         .flex-row button { flex: 1; }
         .stock-info {
             background: #f0fdf4;
@@ -100,6 +93,7 @@
         }
         .toolbar button.export { background-color: #10b981; }
         .toolbar button.import { background-color: #3b82f6; }
+        .toolbar button.config { background-color: #8b5cf6; }
         .table-wrapper {
             overflow-x: auto;
             margin-top: 12px;
@@ -114,10 +108,40 @@
             padding: 8px;
             text-align: left;
         }
-        th {
-            background-color: #f9fafb;
-            font-weight: 600;
+        th { background-color: #f9fafb; font-weight: 600; }
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
         }
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            max-width: 700px;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .field-table { width: 100%; border-collapse: collapse; }
+        .field-table th, .field-table td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            vertical-align: middle;
+        }
+        .field-table input, .field-table select {
+            width: 100%;
+            padding: 6px;
+            margin: 0;
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
     </style>
 </head>
 <body>
@@ -140,24 +164,8 @@
         <div class="toolbar">
             <button id="exportBtn" class="export">📎 导出 Excel</button>
             <button id="importBtn" class="import">📂 导入 Excel</button>
-            <button id="configFieldsBtn" style="background-color:#8b5cf6;">⚙️ 字段配置</button>
-            <div class="toolbar">
+            <button id="configFieldsBtn" class="config">⚙️ 字段配置</button>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
-            <button id="configFieldsBtn" style="background-color: #8b5cf6;">⚙️ 字段配置</button>
-            <div id="configModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
-                <div style="background:white; margin:50px auto; max-width:600px; padding:20px; border-radius:16px;">
-                    <h3>配置字段（当前分类）</h3>
-                    <select id="configCategorySelect">
-                        <option value="试剂">试剂</option>
-                        <option value="耗材">耗材</option>
-                        <option value="物品">物品</option>
-                    </select>
-                    <div id="fieldList"></div>
-                    <button id="addFieldBtn">+ 添加字段</button>
-                    <button id="saveConfigBtn">保存配置</button>
-                    <button id="closeModalBtn">关闭</button>
-                </div>
-            </div>
         </div>
 
         <!-- 条码输入 -->
@@ -202,18 +210,43 @@
         <div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
     </div>
 
-    <!-- 库存表格（可选显示） -->
+    <!-- 库存表格 -->
     <div class="card" id="stockTableCard">
         <strong>📋 当前库存列表</strong>
         <div class="table-wrapper">
             <table id="stockTable">
-                <thead>
-                    <tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr>
-                </thead>
+                <thead><tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr></thead>
                 <tbody id="stockTableBody"><tr><td colspan="5">加载中...</td></tr></tbody>
             </table>
         </div>
         <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
+    </div>
+</div>
+
+<!-- 字段配置模态框 -->
+<div id="configModal" class="modal">
+    <div class="modal-content">
+        <h3>⚙️ 自定义字段配置</h3>
+        <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center;">
+            <label>选择分类：</label>
+            <select id="configCategorySelect">
+                <option value="试剂">试剂</option>
+                <option value="耗材">耗材</option>
+                <option value="物品">物品</option>
+            </select>
+            <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
+        </div>
+        <div id="fieldListContainer">
+            <table class="field-table">
+                <thead><tr><th>字段名(英文)</th><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></tr></thead>
+                <tbody id="fieldTableBody"></tbody>
+            </table>
+        </div>
+        <button id="addFieldRowBtn" style="background-color:#6b7280; margin-top:8px; width:auto;">+ 添加字段</button>
+        <div class="modal-actions">
+            <button id="saveFieldsBtn" style="background-color:#10b981; width:auto;">保存配置</button>
+            <button id="closeModalBtn" style="background-color:#9ca3af; width:auto;">关闭</button>
+        </div>
     </div>
 </div>
 
@@ -251,7 +284,6 @@
         showResult('✅ 服务器地址已保存', 'success');
         loadStockTable();
     }
-
     saveServerBtn.onclick = saveServerUrl;
 
     function showResult(msg, type) {
@@ -353,7 +385,7 @@
             else if (currentMode === 'outbound') msg = `✅ 出库成功，新库存: ${data.new_quantity}`;
             else if (currentMode === 'check') msg = `✅ 盘点记录已保存，差异: ${data.diff}`;
             showResult(msg, 'success');
-            loadStockTable(); // 刷新列表
+            loadStockTable();
         } catch (err) {
             showResult(`❌ 错误: ${err.message}`, 'error');
         }
@@ -367,7 +399,6 @@
     actionBtn.onclick = performAction;
     document.querySelector('.card').insertBefore(actionBtn, document.getElementById('resultArea'));
 
-    // 加载库存列表表格
     async function loadStockTable() {
         if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
         try {
@@ -392,7 +423,7 @@
     }
     refreshTableBtn.onclick = loadStockTable;
 
-    // Excel 导入导出
+    // 导入导出
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const excelFileInput = document.getElementById('excelFileInput');
@@ -436,17 +467,7 @@
         });
     }
 
-    // 初始化
-    loadStockTable();
-    setMode('inbound');
-    inboundBtn.style.backgroundColor = '#2563eb';
-    outboundBtn.style.backgroundColor = '#3b82f6';
-    checkBtn.style.backgroundColor = '#3b82f6';
-    inboundBtn.onclick = () => { setMode('inbound'); inboundBtn.style.backgroundColor = '#2563eb'; outboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
-    outboundBtn.onclick = () => { setMode('outbound'); outboundBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
-    checkBtn.onclick = () => { setMode('check'); checkBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; outboundBtn.style.backgroundColor = '#3b82f6'; };
-
-    // 字段配置相关 DOM 元素
+    // ========== 字段配置模态框 ==========
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -456,44 +477,45 @@
     const addFieldRowBtn = document.getElementById('addFieldRowBtn');
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
 
-    // 打开模态框
     configFieldsBtn.onclick = () => {
-        configModal.style.display = 'block';
-        loadFieldsForCategory(); // 自动加载当前选中的分类
-    };
-
-    // 关闭模态框
-    closeModalBtn.onclick = () => {
-        configModal.style.display = 'none';
-    };
-
-    // 点击模态框背景关闭
-    configModal.onclick = (e) => {
-        if (e.target === configModal) configModal.style.display = 'none';
-    };
-
-    // 加载当前分类的字段配置
-    async function loadFieldsForCategory() {
-        const category = configCategorySelect.value;
         if (!serverBase) {
             alert('请先保存服务器地址');
             return;
         }
+        configModal.style.display = 'block';
+        loadFieldsForCategory(); // 自动加载当前分类
+    };
+    closeModalBtn.onclick = () => { configModal.style.display = 'none'; };
+    configModal.onclick = (e) => { if (e.target === configModal) configModal.style.display = 'none'; };
+
+    async function loadFieldsForCategory() {
+        const category = configCategorySelect.value;
+        if (!serverBase) {
+            fieldTableBody.innerHTML = '<tr><td colspan="5">请先保存服务器地址</td></tr>';
+            return;
+        }
+        fieldTableBody.innerHTML = '<tr><td colspan="5">加载中...</td></tr>';
         try {
-            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`);
-            if (!res.ok) throw new Error('加载失败');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const configs = await res.json();
             renderFieldTable(configs);
         } catch (err) {
             console.error(err);
-            renderFieldTable([]);
+            let msg = err.message;
+            if (err.name === 'AbortError') msg = '请求超时，请检查网络或服务器地址';
+            fieldTableBody.innerHTML = `<tr><td colspan="5" style="color:red;">加载失败: ${msg}</td></tr>`;
         }
     }
 
-    // 渲染字段表格
     function renderFieldTable(configs) {
         fieldTableBody.innerHTML = '';
-        if (configs.length === 0) {
+        if (!configs || configs.length === 0) {
             const row = fieldTableBody.insertRow();
             const cell = row.insertCell(0);
             cell.colSpan = 5;
@@ -501,24 +523,24 @@
             cell.style.textAlign = 'center';
             return;
         }
-        configs.forEach((cfg, idx) => {
+        for (const cfg of configs) {
             const row = fieldTableBody.insertRow();
-            // 字段名（内部名）
-            let cell = row.insertCell(0);
+            // 字段名
+            const cell0 = row.insertCell(0);
             const fieldNameInput = document.createElement('input');
             fieldNameInput.value = cfg.field_name;
-            fieldNameInput.placeholder = "例如 expiry_date";
+            fieldNameInput.placeholder = '例如 expiry_date';
             fieldNameInput.style.width = '100%';
-            cell.appendChild(fieldNameInput);
+            cell0.appendChild(fieldNameInput);
             // 显示名称
-            cell = row.insertCell(1);
+            const cell1 = row.insertCell(1);
             const displayNameInput = document.createElement('input');
             displayNameInput.value = cfg.display_name;
-            displayNameInput.placeholder = "例如 有效期";
+            displayNameInput.placeholder = '例如 有效期';
             displayNameInput.style.width = '100%';
-            cell.appendChild(displayNameInput);
+            cell1.appendChild(displayNameInput);
             // 类型
-            cell = row.insertCell(2);
+            const cell2 = row.insertCell(2);
             const typeSelect = document.createElement('select');
             ['text', 'number', 'date'].forEach(t => {
                 const opt = document.createElement('option');
@@ -527,55 +549,72 @@
                 if (cfg.field_type === t) opt.selected = true;
                 typeSelect.appendChild(opt);
             });
-            cell.appendChild(typeSelect);
+            cell2.appendChild(typeSelect);
             // 必填
-            cell = row.insertCell(3);
-            const requiredCheck = document.createElement('input');
-            requiredCheck.type = 'checkbox';
-            requiredCheck.checked = cfg.is_required === 1;
-            cell.appendChild(requiredCheck);
+            const cell3 = row.insertCell(3);
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = cfg.is_required === 1;
+            cell3.appendChild(chk);
             // 操作
-            cell = row.insertCell(4);
+            const cell4 = row.insertCell(4);
             const delBtn = document.createElement('button');
             delBtn.textContent = '删除';
             delBtn.style.background = '#ef4444';
-            delBtn.onclick = () => {
-                row.remove();
-            };
-            cell.appendChild(delBtn);
-            
-            // 存储临时数据
-            row._data = { fieldNameInput, displayNameInput, typeSelect, requiredCheck };
-        });
+            delBtn.style.padding = '4px 8px';
+            delBtn.onclick = () => row.remove();
+            cell4.appendChild(delBtn);
+            // 存储引用
+            row._data = { fieldNameInput, displayNameInput, typeSelect, chk };
+        }
     }
 
-    // 添加一行空白字段
     addFieldRowBtn.onclick = () => {
         const row = fieldTableBody.insertRow();
-        row.insertCell(0).appendChild(Object.assign(document.createElement('input'), { placeholder: '字段名(英文)', style: 'width:100%' }));
-        row.insertCell(1).appendChild(Object.assign(document.createElement('input'), { placeholder: '显示名称', style: 'width:100%' }));
+        // 字段名
+        const cell0 = row.insertCell(0);
+        const fieldNameInput = document.createElement('input');
+        fieldNameInput.placeholder = '字段名(英文)';
+        fieldNameInput.style.width = '100%';
+        cell0.appendChild(fieldNameInput);
+        // 显示名称
+        const cell1 = row.insertCell(1);
+        const displayNameInput = document.createElement('input');
+        displayNameInput.placeholder = '显示名称';
+        displayNameInput.style.width = '100%';
+        cell1.appendChild(displayNameInput);
+        // 类型
+        const cell2 = row.insertCell(2);
         const typeSelect = document.createElement('select');
-        ['text','number','date'].forEach(t => typeSelect.appendChild(new Option(t, t)));
-        row.insertCell(2).appendChild(typeSelect);
+        ['text', 'number', 'date'].forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            typeSelect.appendChild(opt);
+        });
+        cell2.appendChild(typeSelect);
+        // 必填
+        const cell3 = row.insertCell(3);
         const chk = document.createElement('input');
         chk.type = 'checkbox';
-        row.insertCell(3).appendChild(chk);
+        cell3.appendChild(chk);
+        // 操作
+        const cell4 = row.insertCell(4);
         const delBtn = document.createElement('button');
         delBtn.textContent = '删除';
         delBtn.style.background = '#ef4444';
+        delBtn.style.padding = '4px 8px';
         delBtn.onclick = () => row.remove();
-        row.insertCell(4).appendChild(delBtn);
-        row._data = { fieldNameInput: row.cells[0].firstChild, displayNameInput: row.cells[1].firstChild, typeSelect, requiredCheck: chk };
+        cell4.appendChild(delBtn);
+        row._data = { fieldNameInput, displayNameInput, typeSelect, chk };
     };
 
-    // 保存配置
     saveFieldsBtn.onclick = async () => {
         const category = configCategorySelect.value;
         const rows = fieldTableBody.querySelectorAll('tr');
         const configs = [];
         for (const row of rows) {
-            // 跳过“暂无字段”提示行
-            if (row.cells.length !== 5) continue;
+            if (row.cells.length !== 5) continue; // 跳过提示行
             const fieldName = row.cells[0].firstChild?.value.trim();
             const displayName = row.cells[1].firstChild?.value.trim();
             if (!fieldName || !displayName) continue;
@@ -605,37 +644,17 @@
         }
     };
 
-    // 加载按钮点击事件
     loadFieldsBtn.onclick = loadFieldsForCategory;
-</script>
 
-<!-- 字段配置模态框 -->
-<div id="configModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
-    <div style="background:white; margin:50px auto; max-width:600px; padding:20px; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-        <h3>⚙️ 自定义字段配置</h3>
-        <div style="margin-bottom:12px;">
-            <label>选择分类：</label>
-            <select id="configCategorySelect">
-                <option value="试剂">试剂</option>
-                <option value="耗材">耗材</option>
-                <option value="物品">物品</option>
-            </select>
-            <button id="loadFieldsBtn" style="width:auto; margin-left:10px;">加载</button>
-        </div>
-        <div id="fieldListContainer">
-            <table style="width:100%; border-collapse:collapse;">
-                <thead>
-                    <tr><th>字段名(英文)</th><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></tr>
-                </thead>
-                <tbody id="fieldTableBody"></tbody>
-            </table>
-        </div>
-        <button id="addFieldRowBtn" style="background-color:#6b7280; margin-top:8px;">+ 添加字段</button>
-        <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
-            <button id="saveFieldsBtn" style="background-color:#10b981;">保存配置</button>
-            <button id="closeModalBtn" style="background-color:#9ca3af;">关闭</button>
-        </div>
-    </div>
-</div>
+    // 初始化
+    loadStockTable();
+    setMode('inbound');
+    inboundBtn.style.backgroundColor = '#2563eb';
+    outboundBtn.style.backgroundColor = '#3b82f6';
+    checkBtn.style.backgroundColor = '#3b82f6';
+    inboundBtn.onclick = () => { setMode('inbound'); inboundBtn.style.backgroundColor = '#2563eb'; outboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
+    outboundBtn.onclick = () => { setMode('outbound'); outboundBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
+    checkBtn.onclick = () => { setMode('check'); checkBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; outboundBtn.style.backgroundColor = '#3b82f6'; };
+</script>
 </body>
 </html>
