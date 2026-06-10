@@ -441,3 +441,30 @@ async def import_field_configs_from_excel(file: UploadFile = File(...), category
         raise
     except Exception as e:
         raise HTTPException(500, detail=f"导入失败: {str(e)}")
+    
+@app.get("/api/field_configs/template")
+def download_field_config_template():
+    # 创建一个新的 Excel 工作簿
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "字段配置模板"
+    
+    # 写入表头
+    ws.append(["显示名称", "类型", "必填"])
+    
+    # 写入示例数据（可选，方便用户理解）
+    ws.append(["有效期", "date", "是"])
+    ws.append(["保存温度", "number", "否"])
+    ws.append(["备注", "text", "否"])
+    
+    # 将工作簿保存到内存中的字节流
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # 返回 StreamingResponse，告诉浏览器这是一个附件下载
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=field_config_template.xlsx"}
+    )
