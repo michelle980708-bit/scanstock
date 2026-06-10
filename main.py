@@ -2,6 +2,7 @@ import io
 import os
 import sqlite3
 import json
+import re
 from datetime import datetime
 
 import openpyxl
@@ -10,6 +11,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI()
 
@@ -32,6 +34,21 @@ def get_db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
+
+def generate_unique_field_name(display_name: str, existing_names: list) -> str:
+    if not display_name:
+        display_name = "field"
+    # 将显示名称转换为安全的字段名（只保留字母数字下划线）
+    base = re.sub(r'[^\w\u4e00-\u9fff]', '_', str(display_name))
+    base = re.sub(r'_+', '_', base).strip('_')
+    if not base:
+        base = "field"
+    name = base
+    counter = 1
+    while name in existing_names:
+        name = f"{base}_{counter}"
+        counter += 1
+    return name
 
 def init_db():
     conn = get_db()
@@ -115,10 +132,17 @@ class CheckRequest(BaseModel):
     actual_quantity: int
     reason: str = "盘点调整"
 
+class FieldConfigItem(BaseModel):
+    field_name: Optional[str] = None
+    display_name: str
+    field_type: str = "text"
+    is_required: bool = False
+    sort_order: int = 0
+
 # ---------- 页面 ----------
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    return HTMLResponse("<h1>ScanStock API is running</h1><p>访问 /static/simple_full.html 使用手机端</p>")
+    return HTMLResponse("<h1>ScanStock API is running</h1><p>访问 /static/index.html 使用手机端</p>")
 
 # ---------- API ----------
 @app.get("/api/products")
@@ -224,7 +248,7 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     wb = openpyxl.load_workbook(io.BytesIO(contents))
     ws = wb.active
 
-    headers = [cell.value for cell in ws[1]]
+    headers = [str(cell.value) if cell.value else "" for cell in ws[1]]
     base_mapping = {
         "条码": "barcode",
         "商品名称": "name",
@@ -257,9 +281,9 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
         custom_data = {}
         for col_idx, val in enumerate(row):
             if col_idx in col_map:
-                product_data[col_map[col_idx]] = val
+                product_data[col_map[col_idx]] = str(val) if val is not None else ""
             elif col_idx in custom_col_map:
-                custom_data[custom_col_map[col_idx]] = val
+                custom_data[custom_col_map[col_idx]] = str(val) if val is not None else ""
         
         barcode = product_data.get("barcode")
         name = product_data.get("name")
@@ -299,68 +323,32 @@ def get_field_configs(category: str):
     conn.close()
     return [dict(r) for r in rows]
 
-from typing import Optional
-
-class FieldConfigItem(BaseModel):
-    field_name: Optional[str] = None
-    display_name: str
-    field_type: str = "text"
-    is_required: bool = False
-    sort_order: int = 0
-
-import re
-
-def generate_unique_field_name(display_name: str, existing_names: list) -> str:
-    # 转换为小写，保留字母数字中文，其他替换为下划线
-    base = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff]', '_', display_name.lower())
-    base = re.sub(r'_+', '_', base).strip('_')
-    if not base:
-        base = "field"
-    name = base
-    counter = 1
-    while name in existing_names:
-        name = f"{base}_{counter}"
-        counter += 1
-    return name
-
 @app.post("/api/field_configs/{category}")
 def save_field_configs(category: str, configs: list[FieldConfigItem]):
-    conn = get_db()
-    # 获取该分类下已有的字段名（用于去重）
-    existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
-    existing_names = [row["field_name"] for row in existing]
-    
-    # 删除旧配置
-    conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
-    
-    # 插入新配置
-    for idx, cfg in enumerate(configs):
-        # 如果没有提供 field_name，则自动生成
-        if not cfg.field_name:
-            field_name = generate_unique_field_name(cfg.display_name, existing_names)
-        else:
-            field_name = cfg.field_name
-        conn.execute(
-            """INSERT INTO field_configs 
-               (category, field_name, display_name, field_type, is_required, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (category, field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
-        )
-        # 将新生成的字段名加入列表，防止同一批次内重复
-        existing_names.append(field_name)
-    conn.commit()
-    conn.close()
-    return {"message": "保存成功"}
-    conn = get_db()
-    conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
-    for idx, cfg in enumerate(configs):
-        conn.execute(
-            "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
-            (category, cfg.field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
-        )
-    conn.commit()
-    conn.close()
-    return {"message": "保存成功"}
+    try:
+        conn = get_db()
+        existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
+        existing_names = [row["field_name"] for row in existing]
+        
+        conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
+        
+        for idx, cfg in enumerate(configs):
+            if not cfg.field_name:
+                field_name = generate_unique_field_name(cfg.display_name, existing_names)
+            else:
+                field_name = cfg.field_name
+            conn.execute(
+                """INSERT INTO field_configs 
+                   (category, field_name, display_name, field_type, is_required, sort_order)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (category, field_name, cfg.display_name, cfg.field_type, 1 if cfg.is_required else 0, idx)
+            )
+            existing_names.append(field_name)
+        conn.commit()
+        conn.close()
+        return {"message": "保存成功"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
 @app.post("/api/field_configs/import_excel")
 async def import_field_configs_from_excel(file: UploadFile = File(...), category: str = None):
@@ -368,40 +356,64 @@ async def import_field_configs_from_excel(file: UploadFile = File(...), category
         raise HTTPException(400, "缺少分类参数")
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(400, "只支持 .xlsx 或 .xls 文件")
-    contents = await file.read()
-    wb = openpyxl.load_workbook(io.BytesIO(contents))
-    ws = wb.active
-    headers = [cell.value for cell in ws[1]]
-    # 期望的表头：显示名称、类型、必填
-    expected = ["显示名称", "类型", "必填"]
-    # 简单的列索引识别
-    col_idx = {}
-    for idx, h in enumerate(headers):
-        if h in expected:
-            col_idx[h] = idx
-    if "显示名称" not in col_idx:
-        raise HTTPException(400, "Excel 缺少“显示名称”列")
-    
-    configs = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not any(row):
-            continue
-        display_name = row[col_idx["显示名称"]]
-        if not display_name:
-            continue
-        field_type = "text"
-        if "类型" in col_idx and row[col_idx["类型"]]:
-            ft = str(row[col_idx["类型"]]).lower()
-            if ft in ["text", "number", "date"]:
-                field_type = ft
-        is_required = False
-        if "必填" in col_idx and row[col_idx["必填"]]:
-            val = str(row[col_idx["必填"]]).lower()
-            is_required = val in ["是", "true", "1", "yes"]
-        configs.append(FieldConfigItem(
-            display_name=display_name,
-            field_type=field_type,
-            is_required=is_required
-        ))
-    # 调用保存函数（复用逻辑）
-    return save_field_configs(category, configs)
+    try:
+        contents = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(contents))
+        ws = wb.active
+        
+        # 安全获取表头
+        headers = []
+        for cell in ws[1]:
+            val = cell.value
+            headers.append(str(val) if val is not None else "")
+        
+        col_idx = {}
+        for idx, h in enumerate(headers):
+            if h in ["显示名称", "类型", "必填"]:
+                col_idx[h] = idx
+        
+        if "显示名称" not in col_idx:
+            raise HTTPException(400, "Excel 缺少“显示名称”列")
+        
+        configs = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(row):
+                continue
+            display_name = row[col_idx["显示名称"]]
+            if not display_name:
+                continue
+            display_name = str(display_name).strip()
+            field_type = "text"
+            if "类型" in col_idx and row[col_idx["类型"]]:
+                ft = str(row[col_idx["类型"]]).lower()
+                if ft in ["text", "number", "date"]:
+                    field_type = ft
+            is_required = False
+            if "必填" in col_idx and row[col_idx["必填"]]:
+                val = str(row[col_idx["必填"]]).lower()
+                is_required = val in ["是", "true", "1", "yes"]
+            configs.append(FieldConfigItem(
+                display_name=display_name,
+                field_type=field_type,
+                is_required=is_required
+            ))
+        
+        # 复用保存逻辑
+        conn = get_db()
+        existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
+        existing_names = [row["field_name"] for row in existing]
+        conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
+        for idx, cfg in enumerate(configs):
+            field_name = generate_unique_field_name(cfg.display_name, existing_names)
+            conn.execute(
+                "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?,?,?,?,?,?)",
+                (category, field_name, cfg.display_name, cfg.field_type, 1 if cfg.is_required else 0, idx)
+            )
+            existing_names.append(field_name)
+        conn.commit()
+        conn.close()
+        return {"message": f"导入成功，共 {len(configs)} 个字段"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=f"导入失败: {str(e)}")
