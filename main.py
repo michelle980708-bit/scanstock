@@ -31,8 +31,8 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
+    c = conn.cursor()
+    c.execute('''
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             barcode TEXT UNIQUE NOT NULL,
@@ -44,7 +44,7 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    cursor.execute('''
+    c.execute('''
         CREATE TABLE IF NOT EXISTS stock_movements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             product_id INTEGER NOT NULL,
@@ -55,22 +55,18 @@ def init_db():
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
     ''')
-    cursor.execute("SELECT COUNT(*) FROM products")
-    if cursor.fetchone()[0] == 0:
+    c.execute("SELECT COUNT(*) FROM products")
+    if c.fetchone()[0] == 0:
         sample = [
             ("RE001", "盐酸", "试剂", 10, "试剂柜-01"),
             ("RE002", "酒精", "试剂", 20, "试剂柜-02"),
             ("CO001", "无粉手套", "耗材", 100, "耗材架-A"),
         ]
-        cursor.executemany(
-            "INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)",
-            sample
-        )
+        c.executemany("INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)", sample)
     conn.commit()
     conn.close()
 
-# 启动时初始化
-init_db()
+init_db()  # 启动时初始化
 
 # ---------- 请求模型 ----------
 class InboundRequest(BaseModel):
@@ -88,11 +84,12 @@ class CheckRequest(BaseModel):
     actual_quantity: int
     reason: str = "盘点调整"
 
-# ---------- 根路径 ----------
+# ---------- 页面 ----------
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return HTMLResponse("<h1>ScanStock API is running</h1><p>访问 /static/simple_full.html 使用手机端</p>")
 
+# ---------- API ----------
 @app.get("/api/products")
 def get_products():
     conn = get_db()
@@ -103,13 +100,13 @@ def get_products():
 @app.post("/api/inbound")
 def inbound(req: InboundRequest):
     conn = get_db()
-    product = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
-    if not product:
+    prod = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
+    if not prod:
         raise HTTPException(404, "商品不存在")
-    new_qty = product["quantity"] + req.quantity
-    conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_qty, product["id"]))
+    new_qty = prod["quantity"] + req.quantity
+    conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_qty, prod["id"]))
     conn.execute("INSERT INTO stock_movements (product_id, type, quantity, reason) VALUES (?, 'inbound', ?, ?)",
-                 (product["id"], req.quantity, req.reason))
+                 (prod["id"], req.quantity, req.reason))
     conn.commit()
     conn.close()
     return {"message": "入库成功", "new_quantity": new_qty}
@@ -117,15 +114,15 @@ def inbound(req: InboundRequest):
 @app.post("/api/outbound")
 def outbound(req: OutboundRequest):
     conn = get_db()
-    product = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
-    if not product:
+    prod = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
+    if not prod:
         raise HTTPException(404, "商品不存在")
-    if product["quantity"] < req.quantity:
+    if prod["quantity"] < req.quantity:
         raise HTTPException(400, "库存不足")
-    new_qty = product["quantity"] - req.quantity
-    conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_qty, product["id"]))
+    new_qty = prod["quantity"] - req.quantity
+    conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_qty, prod["id"]))
     conn.execute("INSERT INTO stock_movements (product_id, type, quantity, reason) VALUES (?, 'outbound', ?, ?)",
-                 (product["id"], -req.quantity, req.reason))
+                 (prod["id"], -req.quantity, req.reason))
     conn.commit()
     conn.close()
     return {"message": "出库成功", "new_quantity": new_qty}
@@ -133,15 +130,15 @@ def outbound(req: OutboundRequest):
 @app.post("/api/check")
 def check(req: CheckRequest):
     conn = get_db()
-    product = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
-    if not product:
+    prod = conn.execute("SELECT id, quantity FROM products WHERE barcode = ?", (req.barcode,)).fetchone()
+    if not prod:
         raise HTTPException(404, "商品不存在")
-    old = product["quantity"]
+    old = prod["quantity"]
     diff = req.actual_quantity - old
     if diff != 0:
-        conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (req.actual_quantity, product["id"]))
+        conn.execute("UPDATE products SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (req.actual_quantity, prod["id"]))
         conn.execute("INSERT INTO stock_movements (product_id, type, quantity, reason) VALUES (?, 'check', ?, ?)",
-                     (product["id"], diff, req.reason))
+                     (prod["id"], diff, req.reason))
         conn.commit()
     conn.close()
     return {"message": "盘点记录已保存", "old": old, "new": req.actual_quantity, "diff": diff}
