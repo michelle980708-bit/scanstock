@@ -1,9 +1,10 @@
 import io
 import os
+import re
 import sqlite3
 import json
-import re
 from datetime import datetime
+from typing import Optional
 
 import openpyxl
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -11,9 +12,10 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
 
 app = FastAPI()
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,38 +23,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# ---------- 数据库 ----------
 DB_NAME = "scanstock.db"
 
 def get_db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
-
-def safe_str(val):
-    """安全转换为字符串，避免编码错误"""
-    if val is None:
-        return ""
-    if isinstance(val, bytes):
-        try:
-            return val.decode('utf-8')
-        except UnicodeDecodeError:
-            return val.decode('gbk', errors='ignore')
-    return str(val)
-
-def generate_field_name(display_name: str, existing_names: list) -> str:
-    """根据显示名称生成唯一的英文字段名"""
-    base = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff]', '_', display_name)
-    base = re.sub(r'_+', '_', base).strip('_')
-    if not base:
-        base = "field"
-    name = base
-    counter = 1
-    while name in existing_names:
-        name = f"{base}_{counter}"
-        counter += 1
-    return name
 
 def init_db():
     conn = get_db()
@@ -65,6 +46,7 @@ def init_db():
             category TEXT NOT NULL,
             quantity INTEGER DEFAULT 0,
             location TEXT,
+            custom_fields TEXT DEFAULT '{}',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -80,14 +62,6 @@ def init_db():
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
     ''')
-    c.execute("SELECT COUNT(*) FROM products")
-    if c.fetchone()[0] == 0:
-        sample = [
-            ("RE001", "盐酸", "试剂", 10, "试剂柜-01"),
-            ("RE002", "酒精", "试剂", 20, "试剂柜-02"),
-            ("CO001", "无粉手套", "耗材", 100, "耗材架-A"),
-        ]
-        c.executemany("INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)", sample)
     c.execute('''
         CREATE TABLE IF NOT EXISTS field_configs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,15 +74,34 @@ def init_db():
             UNIQUE(category, field_name)
         )
     ''')
-    try:
-        c.execute("ALTER TABLE products ADD COLUMN custom_fields TEXT DEFAULT '{}'")
-    except:
-        pass
+    # 插入示例商品数据（如果需要）
+    c.execute("SELECT COUNT(*) FROM products")
+    if c.fetchone()[0] == 0:
+        sample = [
+            ("RE001", "盐酸", "试剂", 10, "试剂柜-01"),
+            ("RE002", "酒精", "试剂", 20, "试剂柜-02"),
+            ("CO001", "无粉手套", "耗材", 100, "耗材架-A"),
+        ]
+        c.executemany("INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)", sample)
     conn.commit()
     conn.close()
 
 init_db()
 
+# ---------- 辅助函数 ----------
+def generate_unique_field_name(display_name: str, existing_names: list) -> str:
+    base = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff]', '_', display_name.lower())
+    base = re.sub(r'_+', '_', base).strip('_')
+    if not base:
+        base = "field"
+    name = base
+    counter = 1
+    while name in existing_names:
+        name = f"{base}_{counter}"
+        counter += 1
+    return name
+
+# ---------- Pydantic 模型 ----------
 class InboundRequest(BaseModel):
     barcode: str
     quantity: int
@@ -125,14 +118,18 @@ class CheckRequest(BaseModel):
     reason: str = "盘点调整"
 
 class FieldConfigItem(BaseModel):
+    field_name: Optional[str] = None
     display_name: str
     field_type: str = "text"
     is_required: bool = False
+    sort_order: int = 0
 
+# ---------- 根路径 ----------
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    return HTMLResponse("<h1>ScanStock API is running</h1><p>访问 /static/index.html</p>")
+    return HTMLResponse("<h1>ScanStock API is running</h1><p>访问 /static/index.html 使用手机端</p>")
 
+# ---------- 商品相关 API ----------
 @app.get("/api/products")
 def get_products():
     conn = get_db()
@@ -186,6 +183,7 @@ def check(req: CheckRequest):
     conn.close()
     return {"message": "盘点记录已保存", "old": old, "new": req.actual_quantity, "diff": diff}
 
+# ---------- Excel 导入导出 ----------
 @app.get("/api/export/excel")
 def export_products_to_excel(category: str = None):
     conn = get_db()
@@ -196,24 +194,37 @@ def export_products_to_excel(category: str = None):
         products = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
         fields = []
     conn.close()
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"{category or '所有商品'}"
+
     base_headers = ["条码", "商品名称", "分类", "库存数量", "存放位置"]
     custom_headers = [f["display_name"] for f in fields]
     headers = base_headers + custom_headers
     ws.append(headers)
+
     for p in products:
         custom = json.loads(p["custom_fields"] or "{}")
-        row = [p["barcode"], p["name"], p["category"], p["quantity"], p["location"] or ""]
+        row = [
+            p["barcode"],
+            p["name"],
+            p["category"],
+            p["quantity"],
+            p["location"] or "",
+        ]
         for f in fields:
             row.append(custom.get(f["field_name"], ""))
         ws.append(row)
+
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f"attachment; filename={category or 'products'}.xlsx"})
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={category or 'products'}.xlsx"}
+    )
 
 @app.post("/api/import/excel")
 async def import_products_from_excel(file: UploadFile = File(...), category: str = None):
@@ -222,12 +233,20 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     contents = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(contents))
     ws = wb.active
-    headers = [safe_str(cell.value) for cell in ws[1]]
-    base_mapping = {"条码": "barcode", "商品名称": "name", "分类": "category", "库存数量": "quantity", "存放位置": "location"}
+
+    headers = [cell.value for cell in ws[1]]
+    base_mapping = {
+        "条码": "barcode",
+        "商品名称": "name",
+        "分类": "category",
+        "库存数量": "quantity",
+        "存放位置": "location"
+    }
     conn = get_db()
     fields = []
     if category:
         fields = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
+    
     col_map = {}
     custom_col_map = {}
     for idx, h in enumerate(headers):
@@ -238,6 +257,7 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
                 if f["display_name"] == h:
                     custom_col_map[idx] = f["field_name"]
                     break
+
     success_count = 0
     error_rows = []
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -247,9 +267,10 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
         custom_data = {}
         for col_idx, val in enumerate(row):
             if col_idx in col_map:
-                product_data[col_map[col_idx]] = safe_str(val)
+                product_data[col_map[col_idx]] = val
             elif col_idx in custom_col_map:
-                custom_data[custom_col_map[col_idx]] = safe_str(val)
+                custom_data[custom_col_map[col_idx]] = val
+        
         barcode = product_data.get("barcode")
         name = product_data.get("name")
         if not barcode or not name:
@@ -264,39 +285,107 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
             error_rows.append(f"第 {row_idx} 行缺少分类")
             continue
         location = product_data.get("location", "")
+        
         existing = conn.execute("SELECT id FROM products WHERE barcode = ?", (barcode,)).fetchone()
         if existing:
-            conn.execute("UPDATE products SET name=?, category=?, quantity=?, location=?, custom_fields=?, updated_at=CURRENT_TIMESTAMP WHERE barcode=?",
-                         (name, category_val, quantity, location, json.dumps(custom_data), barcode))
+            conn.execute(
+                "UPDATE products SET name=?, category=?, quantity=?, location=?, custom_fields=?, updated_at=CURRENT_TIMESTAMP WHERE barcode=?",
+                (name, category_val, quantity, location, json.dumps(custom_data), barcode)
+            )
         else:
-            conn.execute("INSERT INTO products (barcode, name, category, quantity, location, custom_fields) VALUES (?,?,?,?,?,?)",
-                         (barcode, name, category_val, quantity, location, json.dumps(custom_data)))
+            conn.execute(
+                "INSERT INTO products (barcode, name, category, quantity, location, custom_fields) VALUES (?,?,?,?,?,?)",
+                (barcode, name, category_val, quantity, location, json.dumps(custom_data))
+            )
         success_count += 1
     conn.commit()
     conn.close()
     return {"message": f"导入完成，成功 {success_count} 条", "errors": error_rows or None}
 
+# ---------- 字段配置 API ----------
 @app.get("/api/field_configs/{category}")
 def get_field_configs(category: str):
     conn = get_db()
     rows = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
     conn.close()
-    return [{"display_name": r["display_name"], "field_type": r["field_type"], "is_required": bool(r["is_required"])} for r in rows]
+    return [dict(r) for r in rows]
 
 @app.post("/api/field_configs/{category}")
 def save_field_configs(category: str, configs: list[FieldConfigItem]):
     try:
         conn = get_db()
         existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
-        existing_names = [r["field_name"] for r in existing]
+        existing_names = [row["field_name"] for row in existing]
         conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
         for idx, cfg in enumerate(configs):
-            field_name = generate_field_name(cfg.display_name, existing_names)
-            conn.execute("INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?,?,?,?,?,?)",
-                         (category, field_name, cfg.display_name, cfg.field_type, 1 if cfg.is_required else 0, idx))
+            if not cfg.field_name:
+                field_name = generate_unique_field_name(cfg.display_name, existing_names)
+            else:
+                field_name = cfg.field_name
+            conn.execute(
+                "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?,?,?,?,?,?)",
+                (category, field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
+            )
             existing_names.append(field_name)
         conn.commit()
         conn.close()
         return {"message": "保存成功"}
     except Exception as e:
-        raise HTTPException(500, detail=f"保存失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"服务器错误: {str(e)}")
+
+@app.post("/api/field_configs/import_excel")
+async def import_field_configs_from_excel(file: UploadFile = File(...), category: str = None):
+    if not category:
+        raise HTTPException(status_code=400, detail="缺少分类参数")
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="只支持 .xlsx 或 .xls 文件")
+    try:
+        contents = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(contents))
+        ws = wb.active
+        headers = [cell.value for cell in ws[1]]
+        expected = ["显示名称", "类型", "必填"]
+        col_idx = {}
+        for idx, h in enumerate(headers):
+            if h in expected:
+                col_idx[h] = idx
+        if "显示名称" not in col_idx:
+            raise HTTPException(status_code=400, detail="Excel 缺少“显示名称”列")
+
+        configs = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(row):
+                continue
+            display_name = row[col_idx["显示名称"]]
+            if not display_name:
+                continue
+            field_type = "text"
+            if "类型" in col_idx and row[col_idx["类型"]]:
+                ft = str(row[col_idx["类型"]]).lower()
+                if ft in ["text", "number", "date"]:
+                    field_type = ft
+            is_required = False
+            if "必填" in col_idx and row[col_idx["必填"]]:
+                val = str(row[col_idx["必填"]]).lower()
+                is_required = val in ["是", "true", "1", "yes"]
+            configs.append(FieldConfigItem(display_name=display_name, field_type=field_type, is_required=is_required))
+        
+        # 直接保存
+        conn = get_db()
+        existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
+        existing_names = [row["field_name"] for row in existing]
+        conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
+        for idx, cfg in enumerate(configs):
+            field_name = generate_unique_field_name(cfg.display_name, existing_names)
+            conn.execute(
+                "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?,?,?,?,?,?)",
+                (category, field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
+            )
+            existing_names.append(field_name)
+        conn.commit()
+        conn.close()
+        return {"message": f"导入成功，共 {len(configs)} 个字段"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")

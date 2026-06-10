@@ -109,7 +109,6 @@
             text-align: left;
         }
         th { background-color: #f9fafb; font-weight: 600; }
-        /* 模态框样式 */
         .modal {
             display: none;
             position: fixed;
@@ -150,7 +149,6 @@
         <h1>📦 ScanStock</h1>
         <div class="sub">手机/电脑通用版 · 扫码出入库/盘点</div>
 
-        <!-- 服务器设置 -->
         <details>
             <summary style="cursor:pointer; margin-bottom:12px;">⚙️ 服务器设置</summary>
             <div class="input-group">
@@ -160,7 +158,6 @@
             </div>
         </details>
 
-        <!-- 导入导出工具栏 -->
         <div class="toolbar">
             <button id="exportBtn" class="export">📎 导出 Excel</button>
             <button id="importBtn" class="import">📂 导入 Excel</button>
@@ -168,7 +165,6 @@
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
         </div>
 
-        <!-- 条码输入 -->
         <div class="input-group">
             <label>📷 条码 / 手动输入</label>
             <input type="text" id="barcodeInput" placeholder="扫描或输入条码" autocomplete="off">
@@ -176,7 +172,6 @@
             <p class="sub" style="margin-top:6px;">注：浏览器需支持 HTTPS 才可调用摄像头，否则请手动输入条码。</p>
         </div>
 
-        <!-- 操作按钮组 -->
         <div class="flex-row">
             <button id="inboundBtn">📥 入库 +</button>
             <button id="outboundBtn">📤 出库 -</button>
@@ -199,7 +194,6 @@
         <div id="resultArea" class="result-area">等待操作...</div>
     </div>
 
-    <!-- 商品信息卡片 -->
     <div class="card" id="productInfoCard" style="display:none;">
         <div style="display: flex; justify-content: space-between;">
             <strong>📄 商品信息</strong>
@@ -210,13 +204,12 @@
         <div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
     </div>
 
-    <!-- 库存表格 -->
     <div class="card" id="stockTableCard">
         <strong>📋 当前库存列表</strong>
         <div class="table-wrapper">
             <table id="stockTable">
                 <thead><tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr></thead>
-                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</td></tr></tbody>
+                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tr></tbody>
             </table>
         </div>
         <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
@@ -235,10 +228,12 @@
                 <option value="物品">物品</option>
             </select>
             <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
-                </div>
+            <button id="importFieldsExcelBtn" style="background-color:#10b981; width:auto;">📂 从Excel导入配置</button>
+            <input type="file" id="fieldsExcelInput" accept=".xlsx, .xls" style="display:none;">
+        </div>
         <div id="fieldListContainer">
             <table class="field-table">
-                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></thead>
+                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></tr></thead>
                 <tbody id="fieldTableBody"></tbody>
             </table>
         </div>
@@ -391,7 +386,6 @@
         }
     }
 
-    // 添加执行按钮
     const actionBtn = document.createElement('button');
     actionBtn.innerText = '▶️ 执行操作';
     actionBtn.style.backgroundColor = '#10b981';
@@ -423,7 +417,6 @@
     }
     refreshTableBtn.onclick = loadStockTable;
 
-    // 导入导出
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const excelFileInput = document.getElementById('excelFileInput');
@@ -467,7 +460,7 @@
         });
     }
 
-    // ========== 字段配置模态框（简化版） ==========
+    // 字段配置模态框
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -476,12 +469,11 @@
     const fieldTableBody = document.getElementById('fieldTableBody');
     const addFieldRowBtn = document.getElementById('addFieldRowBtn');
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
+    const importFieldsExcelBtn = document.getElementById('importFieldsExcelBtn');
+    const fieldsExcelInput = document.getElementById('fieldsExcelInput');
 
     configFieldsBtn.onclick = () => {
-        if (!serverBase) {
-            alert('请先保存服务器地址');
-            return;
-        }
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
         configModal.style.display = 'block';
         loadFieldsForCategory();
     };
@@ -556,7 +548,6 @@
             delBtn.style.padding = '4px 8px';
             delBtn.onclick = () => row.remove();
             cell3.appendChild(delBtn);
-            // 存储引用
             row._data = { displayNameInput, typeSelect, chk };
         }
     }
@@ -626,10 +617,7 @@
 
     loadFieldsBtn.onclick = loadFieldsForCategory;
 
-    // 从 Excel 导入字段配置
-    importFieldsExcelBtn.onclick = () => {
-        fieldsExcelInput.click();
-    };
+    importFieldsExcelBtn.onclick = () => fieldsExcelInput.click();
     fieldsExcelInput.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -644,7 +632,7 @@
             const result = await res.json();
             if (res.ok) {
                 alert(result.message);
-                loadFieldsForCategory(); // 刷新列表
+                loadFieldsForCategory();
             } else {
                 alert('导入失败：' + (result.detail || '未知错误'));
             }
@@ -654,7 +642,6 @@
         fieldsExcelInput.value = '';
     };
 
-    // 初始化
     loadStockTable();
     setMode('inbound');
     inboundBtn.style.backgroundColor = '#2563eb';
