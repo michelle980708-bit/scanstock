@@ -150,9 +150,12 @@ def read_root():
 
 # ---------- 商品 API ----------
 @app.get("/api/products")
-def get_products():
+def get_products(category: str = None):
     conn = get_db()
-    rows = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
+    if category:
+        rows = conn.execute("SELECT * FROM products WHERE category = ? ORDER BY id", (category,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
