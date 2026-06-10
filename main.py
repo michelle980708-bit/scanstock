@@ -1,3 +1,5 @@
+import io
+import openpyxl
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -5,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import sqlite3
+import openpyxl
+from fastapi import UploadFile, File
 from datetime import datetime
 
 app = FastAPI()
@@ -142,3 +146,111 @@ def check(req: CheckRequest):
         conn.commit()
     conn.close()
     return {"message": "盘点记录已保存", "old": old, "new": req.actual_quantity, "diff": diff}
+
+@app.get("/api/export/excel")
+def export_products_to_excel():
+    import io
+    conn = get_db()
+    rows = conn.execute("SELECT id, barcode, name, category, quantity, location FROM products ORDER BY id").fetchall()
+    conn.close()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Products"
+    # 写表头
+    ws.append(["ID", "条码", "名称", "分类", "库存数量", "存放位置"])
+    for row in rows:
+        ws.append([row["id"], row["barcode"], row["name"], row["category"], row["quantity"], row["location"]])
+
+    # 保存到内存
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=products.xlsx"}
+    )
+
+@app.post("/api/import/excel")
+async def import_products_from_excel(file: UploadFile = File(...)):
+    # 检查文件后缀
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(400, "只支持 .xlsx 或 .xls 文件")
+    
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents))
+    ws = wb.active
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    success_count = 0
+    error_rows = []
+    
+    # 假设第一行是表头，从第二行开始读取
+    headers = []
+    for col in ws.iter_cols(max_row=1, values_only=True):
+        headers.append(col[0])
+    
+    # 映射列名到字段（支持中英文）
+    mapping = {
+        "条码": "barcode",
+        "barcode": "barcode",
+        "名称": "name",
+        "name": "name",
+        "分类": "category",
+        "category": "category",
+        "库存": "quantity",
+        "库存数量": "quantity",
+        "quantity": "quantity",
+        "位置": "location",
+        "location": "location",
+    }
+    
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row):  # 空行跳过
+            continue
+        row_data = dict(zip(headers, row))
+        # 提取字段
+        barcode = row_data.get("条码") or row_data.get("barcode")
+        name = row_data.get("名称") or row_data.get("name")
+        category = row_data.get("分类") or row_data.get("category")
+        quantity = row_data.get("库存") or row_data.get("库存数量") or row_data.get("quantity")
+        location = row_data.get("位置") or row_data.get("location")
+        
+        if not barcode or not name:
+            error_rows.append(f"第 {row_idx} 行缺少条码或名称")
+            continue
+        
+        # 数量处理
+        try:
+            quantity = int(quantity) if quantity is not None else 0
+        except:
+            error_rows.append(f"第 {row_idx} 行库存数量不是数字")
+            continue
+        
+        # 检查商品是否存在（根据条码）
+        existing = cursor.execute("SELECT id FROM products WHERE barcode = ?", (barcode,)).fetchone()
+        if existing:
+            # 更新
+            cursor.execute(
+                "UPDATE products SET name=?, category=?, quantity=?, location=?, updated_at=CURRENT_TIMESTAMP WHERE barcode=?",
+                (name, category, quantity, location, barcode)
+            )
+        else:
+            # 插入
+            cursor.execute(
+                "INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)",
+                (barcode, name, category, quantity, location)
+            )
+        success_count += 1
+    
+    conn.commit()
+    conn.close()
+    
+    return {
+        "message": f"导入完成，成功处理 {success_count} 条",
+        "errors": error_rows if error_rows else None
+    }
+
