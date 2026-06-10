@@ -468,3 +468,22 @@ def get_field_configs(category: str):
     rows = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
     conn.close()
     return [{"display_name": r["display_name"], "field_type": r["field_type"], "is_required": bool(r["is_required"])} for r in rows]
+
+@app.get("/api/export/product_template")
+def download_product_template():
+    """下载商品导入模板（基础字段）"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "商品导入模板"
+    headers = ["条码", "商品名称", "分类", "库存数量", "存放位置"]
+    ws.append(headers)
+    # 示例行
+    ws.append(["RE001", "示例商品", "试剂", "10", "位置A"])
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=product_import_template.xlsx"}
+    )

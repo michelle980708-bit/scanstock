@@ -94,6 +94,7 @@
         .toolbar button.export { background-color: #10b981; }
         .toolbar button.import { background-color: #3b82f6; }
         .toolbar button.config { background-color: #8b5cf6; }
+        .toolbar button.template { background-color: #6b7280; }
         .table-wrapper {
             overflow-x: auto;
             margin-top: 12px;
@@ -161,6 +162,7 @@
         <div class="toolbar">
             <button id="exportBtn" class="export">📎 导出 Excel</button>
             <button id="importBtn" class="import">📂 导入 Excel</button>
+            <button id="downloadProductTemplateBtn" class="template">📄 商品导入模板</button>
             <button id="configFieldsBtn" class="config">⚙️ 字段配置</button>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
         </div>
@@ -209,7 +211,7 @@
         <div class="table-wrapper">
             <table id="stockTable">
                 <thead><tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr></thead>
-                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tr></tbody>
+                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tbody>
             </table>
         </div>
         <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
@@ -228,12 +230,13 @@
                 <option value="物品">物品</option>
             </select>
             <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
+            <button id="downloadFieldTemplateBtn" style="background-color:#6b7280; width:auto;">📥 下载模板</button>
             <button id="importFieldsExcelBtn" style="background-color:#10b981; width:auto;">📂 从Excel导入配置</button>
             <input type="file" id="fieldsExcelInput" accept=".xlsx, .xls" style="display:none;">
         </div>
         <div id="fieldListContainer">
             <table class="field-table">
-                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></tr></thead>
+                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></thead>
                 <tbody id="fieldTableBody"></tbody>
             </table>
         </div>
@@ -394,7 +397,7 @@
     document.querySelector('.card').insertBefore(actionBtn, document.getElementById('resultArea'));
 
     async function loadStockTable() {
-        if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
+        if (!serverBase) { stockTableBody.innerHTML = '<td><td colspan="5">请先设置服务器地址</td></tr>'; return; }
         try {
             const res = await fetch(`${serverBase}/api/products`);
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -420,12 +423,17 @@
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const excelFileInput = document.getElementById('excelFileInput');
+    const downloadProductTemplateBtn = document.getElementById('downloadProductTemplateBtn');
 
     exportBtn.onclick = () => {
         if (!serverBase) { alert('请先保存服务器地址'); return; }
         window.location.href = `${serverBase}/api/export/excel`;
     };
     importBtn.onclick = () => excelFileInput.click();
+    downloadProductTemplateBtn.onclick = () => {
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
+        window.location.href = `${serverBase}/api/export/product_template`;
+    };
     excelFileInput.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -471,6 +479,7 @@
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
     const importFieldsExcelBtn = document.getElementById('importFieldsExcelBtn');
     const fieldsExcelInput = document.getElementById('fieldsExcelInput');
+    const downloadFieldTemplateBtn = document.getElementById('downloadFieldTemplateBtn');
 
     configFieldsBtn.onclick = () => {
         if (!serverBase) { alert('请先保存服务器地址'); return; }
@@ -479,6 +488,10 @@
     };
     closeModalBtn.onclick = () => { configModal.style.display = 'none'; };
     configModal.onclick = (e) => { if (e.target === configModal) configModal.style.display = 'none'; };
+    downloadFieldTemplateBtn.onclick = () => {
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
+        window.location.href = `${serverBase}/api/field_configs/template`;
+    };
 
     async function loadFieldsForCategory() {
         const category = configCategorySelect.value;
@@ -516,14 +529,12 @@
         }
         for (const cfg of configs) {
             const row = fieldTableBody.insertRow();
-            // 显示名称
             const cell0 = row.insertCell(0);
             const displayNameInput = document.createElement('input');
             displayNameInput.value = cfg.display_name;
             displayNameInput.placeholder = '显示名称';
             displayNameInput.style.width = '100%';
             cell0.appendChild(displayNameInput);
-            // 类型
             const cell1 = row.insertCell(1);
             const typeSelect = document.createElement('select');
             ['text', 'number', 'date'].forEach(t => {
@@ -534,13 +545,11 @@
                 typeSelect.appendChild(opt);
             });
             cell1.appendChild(typeSelect);
-            // 必填
             const cell2 = row.insertCell(2);
             const chk = document.createElement('input');
             chk.type = 'checkbox';
             chk.checked = cfg.is_required === 1;
             cell2.appendChild(chk);
-            // 操作
             const cell3 = row.insertCell(3);
             const delBtn = document.createElement('button');
             delBtn.textContent = '删除';
