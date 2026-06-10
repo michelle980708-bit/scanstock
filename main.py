@@ -4,6 +4,7 @@ import sqlite3
 import json
 import re
 from datetime import datetime
+from urllib.parse import quote
 
 import openpyxl
 import pandas as pd
@@ -232,8 +233,15 @@ def export_products_to_excel(category: str = None):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f"attachment; filename={category or 'products'}.xlsx"})
+    # 处理中文文件名
+    filename = f"{category or 'products'}.xlsx"
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
+    )
+
 
 @app.post("/api/import/excel")
 async def import_products_from_excel(file: UploadFile = File(...), category: str = None):
