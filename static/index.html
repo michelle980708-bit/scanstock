@@ -235,9 +235,7 @@
                 <option value="物品">物品</option>
             </select>
             <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
-            <button id="importFieldsExcelBtn" style="background-color:#10b981; width:auto;">📂 从Excel导入配置</button>
-            <input type="file" id="fieldsExcelInput" accept=".xlsx, .xls" style="display:none;">
-        </div>
+                </div>
         <div id="fieldListContainer">
             <table class="field-table">
                 <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></thead>
@@ -478,8 +476,6 @@
     const fieldTableBody = document.getElementById('fieldTableBody');
     const addFieldRowBtn = document.getElementById('addFieldRowBtn');
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
-    const importFieldsExcelBtn = document.getElementById('importFieldsExcelBtn');
-    const fieldsExcelInput = document.getElementById('fieldsExcelInput');
 
     configFieldsBtn.onclick = () => {
         if (!serverBase) {
