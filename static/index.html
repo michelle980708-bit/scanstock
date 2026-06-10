@@ -94,7 +94,6 @@
         .toolbar button.export { background-color: #10b981; }
         .toolbar button.import { background-color: #3b82f6; }
         .toolbar button.config { background-color: #8b5cf6; }
-        .toolbar button.template { background-color: #6b7280; }
         .table-wrapper {
             overflow-x: auto;
             margin-top: 12px;
@@ -108,6 +107,7 @@
             border: 1px solid #e5e7eb;
             padding: 8px;
             text-align: left;
+            vertical-align: middle;
         }
         th { background-color: #f9fafb; font-weight: 600; }
         .modal {
@@ -123,17 +123,20 @@
         .modal-content {
             background: white;
             margin: 50px auto;
-            max-width: 700px;
+            max-width: 800px;
             padding: 20px;
             border-radius: 16px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             max-height: 80vh;
             overflow-y: auto;
         }
-        .field-table { width: 100%; border-collapse: collapse; }
+        .field-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
         .field-table th, .field-table td {
             border: 1px solid #ccc;
-            padding: 6px;
+            padding: 8px;
             vertical-align: middle;
         }
         .field-table input, .field-table select {
@@ -141,7 +144,34 @@
             padding: 6px;
             margin: 0;
         }
+        .field-table .move-btn {
+            width: 30px;
+            padding: 4px;
+            margin: 2px;
+            background-color: #6b7280;
+        }
+        .field-table .delete-btn {
+            background-color: #ef4444;
+            padding: 6px 10px;
+        }
+        .duplicate-warning {
+            color: #ef4444;
+            font-size: 0.8rem;
+            margin-left: 5px;
+        }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+        .quick-add-buttons {
+            margin: 12px 0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .quick-add-buttons button {
+            width: auto;
+            padding: 6px 12px;
+            background-color: #10b981;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -150,6 +180,7 @@
         <h1>📦 ScanStock</h1>
         <div class="sub">手机/电脑通用版 · 扫码出入库/盘点</div>
 
+        <!-- 服务器设置 -->
         <details>
             <summary style="cursor:pointer; margin-bottom:12px;">⚙️ 服务器设置</summary>
             <div class="input-group">
@@ -159,14 +190,15 @@
             </div>
         </details>
 
+        <!-- 导入导出工具栏 -->
         <div class="toolbar">
             <button id="exportBtn" class="export">📎 导出 Excel</button>
             <button id="importBtn" class="import">📂 导入 Excel</button>
-            <button id="downloadProductTemplateBtn" class="template">📄 商品导入模板</button>
             <button id="configFieldsBtn" class="config">⚙️ 字段配置</button>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
         </div>
 
+        <!-- 条码输入 -->
         <div class="input-group">
             <label>📷 条码 / 手动输入</label>
             <input type="text" id="barcodeInput" placeholder="扫描或输入条码" autocomplete="off">
@@ -174,6 +206,7 @@
             <p class="sub" style="margin-top:6px;">注：浏览器需支持 HTTPS 才可调用摄像头，否则请手动输入条码。</p>
         </div>
 
+        <!-- 操作按钮组 -->
         <div class="flex-row">
             <button id="inboundBtn">📥 入库 +</button>
             <button id="outboundBtn">📤 出库 -</button>
@@ -196,6 +229,7 @@
         <div id="resultArea" class="result-area">等待操作...</div>
     </div>
 
+    <!-- 商品信息卡片 -->
     <div class="card" id="productInfoCard" style="display:none;">
         <div style="display: flex; justify-content: space-between;">
             <strong>📄 商品信息</strong>
@@ -206,12 +240,13 @@
         <div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
     </div>
 
+    <!-- 库存表格 -->
     <div class="card" id="stockTableCard">
         <strong>📋 当前库存列表</strong>
         <div class="table-wrapper">
             <table id="stockTable">
                 <thead><tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr></thead>
-                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tbody>
+                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tr></tbody>
             </table>
         </div>
         <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
@@ -230,13 +265,17 @@
                 <option value="物品">物品</option>
             </select>
             <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
-            <button id="downloadFieldTemplateBtn" style="background-color:#6b7280; width:auto;">📥 下载模板</button>
-            <button id="importFieldsExcelBtn" style="background-color:#10b981; width:auto;">📂 从Excel导入配置</button>
-            <input type="file" id="fieldsExcelInput" accept=".xlsx, .xls" style="display:none;">
+            <button id="downloadTemplateBtn" style="background-color:#6b7280; width:auto;">📥 下载模板</button>
+        </div>
+        <div class="quick-add-buttons">
+            <span style="font-size:0.9rem; align-self:center;">快捷添加常用字段：</span>
+            <button type="button" data-fields="有效期,date|批号,text|保存温度,number">试剂常用</button>
+            <button type="button" data-fields="规格,text|单位,text|供应商,text">耗材常用</button>
+            <button type="button" data-fields="品牌,text|保修期,date|备注,text">物品常用</button>
         </div>
         <div id="fieldListContainer">
             <table class="field-table">
-                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></thead>
+                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th style="width:100px;">排序</th><th>操作</th></tr></thead>
                 <tbody id="fieldTableBody"></tbody>
             </table>
         </div>
@@ -249,7 +288,7 @@
 </div>
 
 <script>
-    // DOM 元素
+    // ==================== DOM 元素绑定 ====================
     const apiBaseUrlInput = document.getElementById('apiBaseUrl');
     const saveServerBtn = document.getElementById('saveServerBtn');
     const barcodeInput = document.getElementById('barcodeInput');
@@ -274,6 +313,7 @@
     let serverBase = localStorage.getItem('apiBaseUrl') || apiBaseUrlInput.value;
     if (serverBase) apiBaseUrlInput.value = serverBase;
 
+    // ==================== 通用函数 ====================
     function saveServerUrl() {
         let url = apiBaseUrlInput.value.trim();
         if (!url) return;
@@ -389,6 +429,7 @@
         }
     }
 
+    // 添加执行按钮
     const actionBtn = document.createElement('button');
     actionBtn.innerText = '▶️ 执行操作';
     actionBtn.style.backgroundColor = '#10b981';
@@ -397,7 +438,7 @@
     document.querySelector('.card').insertBefore(actionBtn, document.getElementById('resultArea'));
 
     async function loadStockTable() {
-        if (!serverBase) { stockTableBody.innerHTML = '<td><td colspan="5">请先设置服务器地址</td></tr>'; return; }
+        if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
         try {
             const res = await fetch(`${serverBase}/api/products`);
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -420,20 +461,15 @@
     }
     refreshTableBtn.onclick = loadStockTable;
 
+    // 导入导出
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const excelFileInput = document.getElementById('excelFileInput');
-    const downloadProductTemplateBtn = document.getElementById('downloadProductTemplateBtn');
-
     exportBtn.onclick = () => {
         if (!serverBase) { alert('请先保存服务器地址'); return; }
         window.location.href = `${serverBase}/api/export/excel`;
     };
     importBtn.onclick = () => excelFileInput.click();
-    downloadProductTemplateBtn.onclick = () => {
-        if (!serverBase) { alert('请先保存服务器地址'); return; }
-        window.location.href = `${serverBase}/api/export/product_template`;
-    };
     excelFileInput.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -468,7 +504,7 @@
         });
     }
 
-    // 字段配置模态框
+    // ==================== 字段配置模态框增强版 ====================
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -477,29 +513,34 @@
     const fieldTableBody = document.getElementById('fieldTableBody');
     const addFieldRowBtn = document.getElementById('addFieldRowBtn');
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
-    const importFieldsExcelBtn = document.getElementById('importFieldsExcelBtn');
-    const fieldsExcelInput = document.getElementById('fieldsExcelInput');
-    const downloadFieldTemplateBtn = document.getElementById('downloadFieldTemplateBtn');
+    const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
 
+    // 打开模态框
     configFieldsBtn.onclick = () => {
-        if (!serverBase) { alert('请先保存服务器地址'); return; }
+        if (!serverBase) {
+            alert('请先保存服务器地址');
+            return;
+        }
         configModal.style.display = 'block';
         loadFieldsForCategory();
     };
     closeModalBtn.onclick = () => { configModal.style.display = 'none'; };
     configModal.onclick = (e) => { if (e.target === configModal) configModal.style.display = 'none'; };
-    downloadFieldTemplateBtn.onclick = () => {
+
+    // 下载模板
+    downloadTemplateBtn.onclick = () => {
         if (!serverBase) { alert('请先保存服务器地址'); return; }
         window.location.href = `${serverBase}/api/field_configs/template`;
     };
 
+    // 加载字段
     async function loadFieldsForCategory() {
         const category = configCategorySelect.value;
         if (!serverBase) {
-            fieldTableBody.innerHTML = '<tr><td colspan="4">请先保存服务器地址</td></tr>';
+            fieldTableBody.innerHTML = '<tr><td colspan="5">请先保存服务器地址</td></tr>';
             return;
         }
-        fieldTableBody.innerHTML = '<tr><td colspan="4">加载中...</td></tr>';
+        fieldTableBody.innerHTML = '<tr><td colspan="5">加载中...</td></tr>';
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -513,28 +554,75 @@
         } catch (err) {
             let msg = err.message;
             if (err.name === 'AbortError') msg = '请求超时';
-            fieldTableBody.innerHTML = `<tr><td colspan="4" style="color:red;">加载失败: ${msg}</td></tr>`;
+            fieldTableBody.innerHTML = `<tr><td colspan="5" style="color:red;">加载失败: ${msg}</td></tr>`;
         }
     }
 
+    // 获取当前表格中的显示名称列表（用于去重检测）
+    function getCurrentDisplayNames() {
+        const names = [];
+        for (let i = 0; i < fieldTableBody.rows.length; i++) {
+            const row = fieldTableBody.rows[i];
+            if (row.cells.length !== 5) continue; // 跳过提示行
+            const displayNameInput = row.cells[0].querySelector('input');
+            if (displayNameInput && displayNameInput.value.trim()) {
+                names.push(displayNameInput.value.trim());
+            }
+        }
+        return names;
+    }
+
+    // 检查并标记重复
+    function checkDuplicateNames() {
+        const names = getCurrentDisplayNames();
+        const seen = new Map();
+        for (let i = 0; i < fieldTableBody.rows.length; i++) {
+            const row = fieldTableBody.rows[i];
+            if (row.cells.length !== 5) continue;
+            const displayNameInput = row.cells[0].querySelector('input');
+            if (!displayNameInput) continue;
+            const val = displayNameInput.value.trim();
+            let warningSpan = row._warningSpan;
+            if (!warningSpan) {
+                warningSpan = document.createElement('span');
+                warningSpan.className = 'duplicate-warning';
+                displayNameInput.parentNode.appendChild(warningSpan);
+                row._warningSpan = warningSpan;
+            }
+            if (val && seen.has(val)) {
+                warningSpan.textContent = '⚠️ 重复';
+                warningSpan.style.display = 'inline';
+            } else {
+                warningSpan.textContent = '';
+                warningSpan.style.display = 'none';
+            }
+            if (val) seen.set(val, true);
+        }
+    }
+
+    // 渲染字段表格（支持排序、删除、上下移动）
     function renderFieldTable(configs) {
         fieldTableBody.innerHTML = '';
         if (!configs || configs.length === 0) {
             const row = fieldTableBody.insertRow();
             const cell = row.insertCell(0);
-            cell.colSpan = 4;
+            cell.colSpan = 5;
             cell.textContent = '暂无自定义字段，点击"添加字段"添加';
             cell.style.textAlign = 'center';
             return;
         }
-        for (const cfg of configs) {
+        for (let idx = 0; idx < configs.length; idx++) {
+            const cfg = configs[idx];
             const row = fieldTableBody.insertRow();
+            // 显示名称
             const cell0 = row.insertCell(0);
             const displayNameInput = document.createElement('input');
             displayNameInput.value = cfg.display_name;
             displayNameInput.placeholder = '显示名称';
             displayNameInput.style.width = '100%';
+            displayNameInput.addEventListener('input', () => checkDuplicateNames());
             cell0.appendChild(displayNameInput);
+            // 类型
             const cell1 = row.insertCell(1);
             const typeSelect = document.createElement('select');
             ['text', 'number', 'date'].forEach(t => {
@@ -545,28 +633,70 @@
                 typeSelect.appendChild(opt);
             });
             cell1.appendChild(typeSelect);
+            // 必填
             const cell2 = row.insertCell(2);
             const chk = document.createElement('input');
             chk.type = 'checkbox';
-            chk.checked = cfg.is_required === 1;
+            chk.checked = cfg.is_required === true;
             cell2.appendChild(chk);
+            // 排序按钮（上移/下移）
             const cell3 = row.insertCell(3);
+            const upBtn = document.createElement('button');
+            upBtn.textContent = '↑';
+            upBtn.className = 'move-btn';
+            upBtn.style.width = '30px';
+            upBtn.onclick = () => moveRow(row, -1);
+            const downBtn = document.createElement('button');
+            downBtn.textContent = '↓';
+            downBtn.className = 'move-btn';
+            downBtn.style.width = '30px';
+            downBtn.onclick = () => moveRow(row, 1);
+            cell3.appendChild(upBtn);
+            cell3.appendChild(downBtn);
+            // 删除
+            const cell4 = row.insertCell(4);
             const delBtn = document.createElement('button');
             delBtn.textContent = '删除';
-            delBtn.style.background = '#ef4444';
+            delBtn.className = 'delete-btn';
+            delBtn.style.backgroundColor = '#ef4444';
             delBtn.style.padding = '4px 8px';
-            delBtn.onclick = () => row.remove();
-            cell3.appendChild(delBtn);
+            delBtn.onclick = () => {
+                row.remove();
+                checkDuplicateNames();
+            };
+            cell4.appendChild(delBtn);
+            // 存储引用
             row._data = { displayNameInput, typeSelect, chk };
         }
+        checkDuplicateNames();
     }
 
+    // 移动行
+    function moveRow(row, direction) {
+        const index = row.rowIndex;
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= fieldTableBody.rows.length) return;
+        const parent = row.parentNode;
+        if (direction === -1) {
+            parent.insertBefore(row, parent.rows[newIndex]);
+        } else {
+            if (newIndex < parent.rows.length - 1) {
+                parent.insertBefore(row, parent.rows[newIndex + 1]);
+            } else {
+                parent.appendChild(row);
+            }
+        }
+        checkDuplicateNames();
+    }
+
+    // 添加空白行
     addFieldRowBtn.onclick = () => {
         const row = fieldTableBody.insertRow();
         const cell0 = row.insertCell(0);
         const displayNameInput = document.createElement('input');
         displayNameInput.placeholder = '显示名称';
         displayNameInput.style.width = '100%';
+        displayNameInput.addEventListener('input', () => checkDuplicateNames());
         cell0.appendChild(displayNameInput);
         const cell1 = row.insertCell(1);
         const typeSelect = document.createElement('select');
@@ -582,29 +712,56 @@
         chk.type = 'checkbox';
         cell2.appendChild(chk);
         const cell3 = row.insertCell(3);
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '↑';
+        upBtn.className = 'move-btn';
+        upBtn.onclick = () => moveRow(row, -1);
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '↓';
+        downBtn.className = 'move-btn';
+        downBtn.onclick = () => moveRow(row, 1);
+        cell3.appendChild(upBtn);
+        cell3.appendChild(downBtn);
+        const cell4 = row.insertCell(4);
         const delBtn = document.createElement('button');
         delBtn.textContent = '删除';
-        delBtn.style.background = '#ef4444';
-        delBtn.style.padding = '4px 8px';
-        delBtn.onclick = () => row.remove();
-        cell3.appendChild(delBtn);
+        delBtn.className = 'delete-btn';
+        delBtn.style.backgroundColor = '#ef4444';
+        delBtn.onclick = () => {
+            row.remove();
+            checkDuplicateNames();
+        };
+        cell4.appendChild(delBtn);
         row._data = { displayNameInput, typeSelect, chk };
+        checkDuplicateNames();
     };
 
+    // 保存字段配置
     saveFieldsBtn.onclick = async () => {
         const category = configCategorySelect.value;
         const rows = fieldTableBody.querySelectorAll('tr');
         const configs = [];
+        let hasError = false;
         for (const row of rows) {
-            if (row.cells.length !== 4) continue;
-            const displayName = row.cells[0].firstChild?.value.trim();
+            if (row.cells.length !== 5) continue;
+            const displayName = row.cells[0].querySelector('input')?.value.trim();
             if (!displayName) continue;
+            // 检查是否重复（二次确认）
+            const dup = row.querySelector('.duplicate-warning')?.textContent.includes('重复');
+            if (dup) {
+                alert(`显示名称“${displayName}”重复，请修改后再保存`);
+                hasError = true;
+                break;
+            }
+            const fieldType = row.cells[1].querySelector('select')?.value || 'text';
+            const isRequired = row.cells[2].querySelector('input')?.checked || false;
             configs.push({
                 display_name: displayName,
-                field_type: row.cells[1].firstChild?.value || 'text',
-                is_required: row.cells[2].firstChild?.checked || false
+                field_type: fieldType,
+                is_required: isRequired
             });
         }
+        if (hasError) return;
         if (!serverBase) {
             alert('请先保存服务器地址');
             return;
@@ -626,31 +783,44 @@
 
     loadFieldsBtn.onclick = loadFieldsForCategory;
 
-    importFieldsExcelBtn.onclick = () => fieldsExcelInput.click();
-    fieldsExcelInput.onchange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const category = configCategorySelect.value;
-        const formData = new FormData();
-        formData.append('file', file);
-        try {
-            const res = await fetch(`${serverBase}/api/field_configs/import_excel?category=${encodeURIComponent(category)}`, {
-                method: 'POST',
-                body: formData
-            });
-            const result = await res.json();
-            if (res.ok) {
-                alert(result.message);
-                loadFieldsForCategory();
-            } else {
-                alert('导入失败：' + (result.detail || '未知错误'));
+    // 快捷添加常用字段
+    const quickAddBtns = document.querySelectorAll('.quick-add-buttons button');
+    quickAddBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const fieldsStr = btn.getAttribute('data-fields');
+            if (!fieldsStr) return;
+            const pairs = fieldsStr.split('|');
+            const existingNames = getCurrentDisplayNames();
+            for (const pair of pairs) {
+                const [name, type] = pair.split(',');
+                if (!name) continue;
+                if (existingNames.includes(name)) {
+                    alert(`字段“${name}”已存在，跳过添加`);
+                    continue;
+                }
+                // 添加一行
+                addFieldRowBtn.click();
+                const newRow = fieldTableBody.lastElementChild;
+                if (newRow && newRow.cells.length === 5) {
+                    const nameInput = newRow.cells[0].querySelector('input');
+                    if (nameInput) nameInput.value = name;
+                    const typeSelect = newRow.cells[1].querySelector('select');
+                    if (typeSelect && type) {
+                        for (let i = 0; i < typeSelect.options.length; i++) {
+                            if (typeSelect.options[i].value === type) {
+                                typeSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+                existingNames.push(name);
             }
-        } catch (err) {
-            alert('网络错误：' + err.message);
-        }
-        fieldsExcelInput.value = '';
-    };
+            checkDuplicateNames();
+        });
+    });
 
+    // 初始化
     loadStockTable();
     setMode('inbound');
     inboundBtn.style.backgroundColor = '#2563eb';
