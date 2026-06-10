@@ -36,6 +36,8 @@ def get_db():
 def init_db():
     conn = get_db()
     c = conn.cursor()
+    
+    # 创建商品表
     c.execute('''
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +50,8 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # 创建库存变动表
     c.execute('''
         CREATE TABLE IF NOT EXISTS stock_movements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +63,8 @@ def init_db():
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
     ''')
+    
+    # 插入示例数据
     c.execute("SELECT COUNT(*) FROM products")
     if c.fetchone()[0] == 0:
         sample = [
@@ -67,31 +73,31 @@ def init_db():
             ("CO001", "无粉手套", "耗材", 100, "耗材架-A"),
         ]
         c.executemany("INSERT INTO products (barcode, name, category, quantity, location) VALUES (?,?,?,?,?)", sample)
-    conn.commit()
-    conn.close()
-
-    # 字段配置表
+    
+    # 创建字段配置表
     c.execute('''
         CREATE TABLE IF NOT EXISTS field_configs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT NOT NULL,              -- 分类名称（如“试剂”）
-            field_name TEXT NOT NULL,            -- 字段内部名（如“expiry_date”）
-            display_name TEXT NOT NULL,          -- 显示名称（如“有效期”）
-            field_type TEXT DEFAULT 'text',      -- text, number, date
+            category TEXT NOT NULL,
+            field_name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            field_type TEXT DEFAULT 'text',
             is_required INTEGER DEFAULT 0,
             sort_order INTEGER DEFAULT 0,
             UNIQUE(category, field_name)
         )
     ''')
+    
+    # 添加 custom_fields 列
     try:
         c.execute("ALTER TABLE products ADD COLUMN custom_fields TEXT DEFAULT '{}'")
-    except sqlite3.OperationalError;
-        pass #列已存在
+    except sqlite3.OperationalError:
+        pass  # 列已存在
+    
     conn.commit()
     conn.close()
 
-    
-init_db()  # 启动时初始化
+init_db()
 
 # ---------- 请求模型 ----------
 class InboundRequest(BaseModel):
@@ -171,33 +177,23 @@ def check(req: CheckRequest):
 @app.get("/api/export/excel")
 def export_products_to_excel(category: str = None):
     conn = get_db()
-    # 如果指定了分类，只导出该分类的商品，并使用其字段配置
     if category:
-        products = conn.execute(
-            "SELECT * FROM products WHERE category = ? ORDER BY id",
-            (category,)
-        ).fetchall()
-        # 获取字段配置
-        fields = conn.execute(
-            "SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order",
-            (category,)
-        ).fetchall()
+        products = conn.execute("SELECT * FROM products WHERE category = ? ORDER BY id", (category,)).fetchall()
+        fields = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
     else:
         products = conn.execute("SELECT * FROM products ORDER BY id").fetchall()
-        fields = []  # 无自定义字段
+        fields = []
     conn.close()
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"{category or '所有商品'}"
 
-    # 构建表头：基础字段 + 自定义字段
     base_headers = ["条码", "商品名称", "分类", "库存数量", "存放位置"]
     custom_headers = [f["display_name"] for f in fields]
     headers = base_headers + custom_headers
     ws.append(headers)
 
-    # 写入数据
     for p in products:
         custom = json.loads(p["custom_fields"] or "{}")
         row = [
@@ -214,11 +210,11 @@ def export_products_to_excel(category: str = None):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f"attachment; filename={category or 'products'}.xlsx"})
-
-
-
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={category or 'products'}.xlsx"}
+    )
 
 @app.post("/api/import/excel")
 async def import_products_from_excel(file: UploadFile = File(...), category: str = None):
@@ -228,9 +224,7 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     wb = openpyxl.load_workbook(io.BytesIO(contents))
     ws = wb.active
 
-    # 获取表头
     headers = [cell.value for cell in ws[1]]
-    # 基础字段映射（表头文字 -> 数据库字段）
     base_mapping = {
         "条码": "barcode",
         "商品名称": "name",
@@ -238,22 +232,17 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
         "库存数量": "quantity",
         "存放位置": "location"
     }
-    # 获取该分类的字段配置
     conn = get_db()
     fields = []
     if category:
-        fields = conn.execute(
-            "SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order",
-            (category,)
-        ).fetchall()
-    # 建立列索引映射
+        fields = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
+    
     col_map = {}
-    custom_col_map = {}  # 存储自定义字段的索引和 field_name
+    custom_col_map = {}
     for idx, h in enumerate(headers):
         if h in base_mapping:
             col_map[idx] = base_mapping[h]
         else:
-            # 匹配自定义字段的 display_name
             for f in fields:
                 if f["display_name"] == h:
                     custom_col_map[idx] = f["field_name"]
@@ -264,7 +253,6 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not any(row):
             continue
-        # 解析基础字段
         product_data = {}
         custom_data = {}
         for col_idx, val in enumerate(row):
@@ -272,13 +260,12 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
                 product_data[col_map[col_idx]] = val
             elif col_idx in custom_col_map:
                 custom_data[custom_col_map[col_idx]] = val
-        # 验证必填
+        
         barcode = product_data.get("barcode")
         name = product_data.get("name")
         if not barcode or not name:
             error_rows.append(f"第 {row_idx} 行缺少条码或商品名称")
             continue
-        # 处理数量
         try:
             quantity = int(product_data.get("quantity", 0))
         except:
@@ -288,18 +275,16 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
             error_rows.append(f"第 {row_idx} 行缺少分类")
             continue
         location = product_data.get("location", "")
-        # 更新或插入
+        
         existing = conn.execute("SELECT id FROM products WHERE barcode = ?", (barcode,)).fetchone()
         if existing:
             conn.execute(
-                """UPDATE products SET name=?, category=?, quantity=?, location=?, custom_fields=?, updated_at=CURRENT_TIMESTAMP
-                   WHERE barcode=?""",
+                "UPDATE products SET name=?, category=?, quantity=?, location=?, custom_fields=?, updated_at=CURRENT_TIMESTAMP WHERE barcode=?",
                 (name, category_val, quantity, location, json.dumps(custom_data), barcode)
             )
         else:
             conn.execute(
-                """INSERT INTO products (barcode, name, category, quantity, location, custom_fields)
-                   VALUES (?,?,?,?,?,?)""",
+                "INSERT INTO products (barcode, name, category, quantity, location, custom_fields) VALUES (?,?,?,?,?,?)",
                 (barcode, name, category_val, quantity, location, json.dumps(custom_data))
             )
         success_count += 1
@@ -307,17 +292,13 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     conn.close()
     return {"message": f"导入完成，成功 {success_count} 条", "errors": error_rows or None}
 
-@app.get("/api/field_configs/{category}") #後端API：获取某个分类的字段配置
+@app.get("/api/field_configs/{category}")
 def get_field_configs(category: str):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order",
-        (category,)
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-from pydantic import BaseModel
 class FieldConfigItem(BaseModel):
     field_name: str
     display_name: str
@@ -325,20 +306,15 @@ class FieldConfigItem(BaseModel):
     is_required: bool = False
     sort_order: int = 0
 
-@app.post("/api/field_configs/{category}") #保存字段配置（批量更新）
+@app.post("/api/field_configs/{category}")
 def save_field_configs(category: str, configs: list[FieldConfigItem]):
     conn = get_db()
-    # 删除该分类旧配置
     conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
-    # 插入新配置
     for idx, cfg in enumerate(configs):
         conn.execute(
-            """INSERT INTO field_configs 
-               (category, field_name, display_name, field_type, is_required, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
             (category, cfg.field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
         )
     conn.commit()
     conn.close()
     return {"message": "保存成功"}
-
