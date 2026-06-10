@@ -227,7 +227,7 @@
 <div id="configModal" class="modal">
     <div class="modal-content">
         <h3>⚙️ 自定义字段配置</h3>
-        <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center;">
+        <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <label>选择分类：</label>
             <select id="configCategorySelect">
                 <option value="试剂">试剂</option>
@@ -235,10 +235,12 @@
                 <option value="物品">物品</option>
             </select>
             <button id="loadFieldsBtn" style="width:auto; padding:6px 12px;">加载</button>
+            <button id="importFieldsExcelBtn" style="background-color:#10b981; width:auto;">📂 从Excel导入配置</button>
+            <input type="file" id="fieldsExcelInput" accept=".xlsx, .xls" style="display:none;">
         </div>
         <div id="fieldListContainer">
             <table class="field-table">
-                <thead><tr><th>字段名(英文)</th><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></tr></thead>
+                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>操作</th></thead>
                 <tbody id="fieldTableBody"></tbody>
             </table>
         </div>
@@ -467,7 +469,7 @@
         });
     }
 
-    // ========== 字段配置模态框 ==========
+    // ========== 字段配置模态框（简化版） ==========
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -476,6 +478,8 @@
     const fieldTableBody = document.getElementById('fieldTableBody');
     const addFieldRowBtn = document.getElementById('addFieldRowBtn');
     const saveFieldsBtn = document.getElementById('saveFieldsBtn');
+    const importFieldsExcelBtn = document.getElementById('importFieldsExcelBtn');
+    const fieldsExcelInput = document.getElementById('fieldsExcelInput');
 
     configFieldsBtn.onclick = () => {
         if (!serverBase) {
@@ -483,7 +487,7 @@
             return;
         }
         configModal.style.display = 'block';
-        loadFieldsForCategory(); // 自动加载当前分类
+        loadFieldsForCategory();
     };
     closeModalBtn.onclick = () => { configModal.style.display = 'none'; };
     configModal.onclick = (e) => { if (e.target === configModal) configModal.style.display = 'none'; };
@@ -491,10 +495,10 @@
     async function loadFieldsForCategory() {
         const category = configCategorySelect.value;
         if (!serverBase) {
-            fieldTableBody.innerHTML = '<tr><td colspan="5">请先保存服务器地址</td></tr>';
+            fieldTableBody.innerHTML = '<tr><td colspan="4">请先保存服务器地址</td></tr>';
             return;
         }
-        fieldTableBody.innerHTML = '<tr><td colspan="5">加载中...</td></tr>';
+        fieldTableBody.innerHTML = '<tr><td colspan="4">加载中...</td></tr>';
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -506,10 +510,9 @@
             const configs = await res.json();
             renderFieldTable(configs);
         } catch (err) {
-            console.error(err);
             let msg = err.message;
-            if (err.name === 'AbortError') msg = '请求超时，请检查网络或服务器地址';
-            fieldTableBody.innerHTML = `<tr><td colspan="5" style="color:red;">加载失败: ${msg}</td></tr>`;
+            if (err.name === 'AbortError') msg = '请求超时';
+            fieldTableBody.innerHTML = `<tr><td colspan="4" style="color:red;">加载失败: ${msg}</td></tr>`;
         }
     }
 
@@ -518,29 +521,22 @@
         if (!configs || configs.length === 0) {
             const row = fieldTableBody.insertRow();
             const cell = row.insertCell(0);
-            cell.colSpan = 5;
+            cell.colSpan = 4;
             cell.textContent = '暂无自定义字段，点击"添加字段"添加';
             cell.style.textAlign = 'center';
             return;
         }
         for (const cfg of configs) {
             const row = fieldTableBody.insertRow();
-            // 字段名
-            const cell0 = row.insertCell(0);
-            const fieldNameInput = document.createElement('input');
-            fieldNameInput.value = cfg.field_name;
-            fieldNameInput.placeholder = '例如 expiry_date';
-            fieldNameInput.style.width = '100%';
-            cell0.appendChild(fieldNameInput);
             // 显示名称
-            const cell1 = row.insertCell(1);
+            const cell0 = row.insertCell(0);
             const displayNameInput = document.createElement('input');
             displayNameInput.value = cfg.display_name;
-            displayNameInput.placeholder = '例如 有效期';
+            displayNameInput.placeholder = '显示名称';
             displayNameInput.style.width = '100%';
-            cell1.appendChild(displayNameInput);
+            cell0.appendChild(displayNameInput);
             // 类型
-            const cell2 = row.insertCell(2);
+            const cell1 = row.insertCell(1);
             const typeSelect = document.createElement('select');
             ['text', 'number', 'date'].forEach(t => {
                 const opt = document.createElement('option');
@@ -549,42 +545,34 @@
                 if (cfg.field_type === t) opt.selected = true;
                 typeSelect.appendChild(opt);
             });
-            cell2.appendChild(typeSelect);
+            cell1.appendChild(typeSelect);
             // 必填
-            const cell3 = row.insertCell(3);
+            const cell2 = row.insertCell(2);
             const chk = document.createElement('input');
             chk.type = 'checkbox';
             chk.checked = cfg.is_required === 1;
-            cell3.appendChild(chk);
+            cell2.appendChild(chk);
             // 操作
-            const cell4 = row.insertCell(4);
+            const cell3 = row.insertCell(3);
             const delBtn = document.createElement('button');
             delBtn.textContent = '删除';
             delBtn.style.background = '#ef4444';
             delBtn.style.padding = '4px 8px';
             delBtn.onclick = () => row.remove();
-            cell4.appendChild(delBtn);
+            cell3.appendChild(delBtn);
             // 存储引用
-            row._data = { fieldNameInput, displayNameInput, typeSelect, chk };
+            row._data = { displayNameInput, typeSelect, chk };
         }
     }
 
     addFieldRowBtn.onclick = () => {
         const row = fieldTableBody.insertRow();
-        // 字段名
         const cell0 = row.insertCell(0);
-        const fieldNameInput = document.createElement('input');
-        fieldNameInput.placeholder = '字段名(英文)';
-        fieldNameInput.style.width = '100%';
-        cell0.appendChild(fieldNameInput);
-        // 显示名称
-        const cell1 = row.insertCell(1);
         const displayNameInput = document.createElement('input');
         displayNameInput.placeholder = '显示名称';
         displayNameInput.style.width = '100%';
-        cell1.appendChild(displayNameInput);
-        // 类型
-        const cell2 = row.insertCell(2);
+        cell0.appendChild(displayNameInput);
+        const cell1 = row.insertCell(1);
         const typeSelect = document.createElement('select');
         ['text', 'number', 'date'].forEach(t => {
             const opt = document.createElement('option');
@@ -592,21 +580,19 @@
             opt.textContent = t;
             typeSelect.appendChild(opt);
         });
-        cell2.appendChild(typeSelect);
-        // 必填
-        const cell3 = row.insertCell(3);
+        cell1.appendChild(typeSelect);
+        const cell2 = row.insertCell(2);
         const chk = document.createElement('input');
         chk.type = 'checkbox';
-        cell3.appendChild(chk);
-        // 操作
-        const cell4 = row.insertCell(4);
+        cell2.appendChild(chk);
+        const cell3 = row.insertCell(3);
         const delBtn = document.createElement('button');
         delBtn.textContent = '删除';
         delBtn.style.background = '#ef4444';
         delBtn.style.padding = '4px 8px';
         delBtn.onclick = () => row.remove();
-        cell4.appendChild(delBtn);
-        row._data = { fieldNameInput, displayNameInput, typeSelect, chk };
+        cell3.appendChild(delBtn);
+        row._data = { displayNameInput, typeSelect, chk };
     };
 
     saveFieldsBtn.onclick = async () => {
@@ -614,15 +600,13 @@
         const rows = fieldTableBody.querySelectorAll('tr');
         const configs = [];
         for (const row of rows) {
-            if (row.cells.length !== 5) continue; // 跳过提示行
-            const fieldName = row.cells[0].firstChild?.value.trim();
-            const displayName = row.cells[1].firstChild?.value.trim();
-            if (!fieldName || !displayName) continue;
+            if (row.cells.length !== 4) continue;
+            const displayName = row.cells[0].firstChild?.value.trim();
+            if (!displayName) continue;
             configs.push({
-                field_name: fieldName,
                 display_name: displayName,
-                field_type: row.cells[2].firstChild?.value || 'text',
-                is_required: row.cells[3].firstChild?.checked || false
+                field_type: row.cells[1].firstChild?.value || 'text',
+                is_required: row.cells[2].firstChild?.checked || false
             });
         }
         if (!serverBase) {
@@ -645,6 +629,34 @@
     };
 
     loadFieldsBtn.onclick = loadFieldsForCategory;
+
+    // 从 Excel 导入字段配置
+    importFieldsExcelBtn.onclick = () => {
+        fieldsExcelInput.click();
+    };
+    fieldsExcelInput.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const category = configCategorySelect.value;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch(`${serverBase}/api/field_configs/import_excel?category=${encodeURIComponent(category)}`, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (res.ok) {
+                alert(result.message);
+                loadFieldsForCategory(); // 刷新列表
+            } else {
+                alert('导入失败：' + (result.detail || '未知错误'));
+            }
+        } catch (err) {
+            alert('网络错误：' + err.message);
+        }
+        fieldsExcelInput.value = '';
+    };
 
     // 初始化
     loadStockTable();

@@ -299,15 +299,58 @@ def get_field_configs(category: str):
     conn.close()
     return [dict(r) for r in rows]
 
+from typing import Optional
+
 class FieldConfigItem(BaseModel):
-    field_name: str
+    field_name: Optional[str] = None
     display_name: str
     field_type: str = "text"
     is_required: bool = False
     sort_order: int = 0
 
+import re
+
+def generate_unique_field_name(display_name: str, existing_names: list) -> str:
+    # 转换为小写，保留字母数字中文，其他替换为下划线
+    base = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff]', '_', display_name.lower())
+    base = re.sub(r'_+', '_', base).strip('_')
+    if not base:
+        base = "field"
+    name = base
+    counter = 1
+    while name in existing_names:
+        name = f"{base}_{counter}"
+        counter += 1
+    return name
+
 @app.post("/api/field_configs/{category}")
 def save_field_configs(category: str, configs: list[FieldConfigItem]):
+    conn = get_db()
+    # 获取该分类下已有的字段名（用于去重）
+    existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
+    existing_names = [row["field_name"] for row in existing]
+    
+    # 删除旧配置
+    conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
+    
+    # 插入新配置
+    for idx, cfg in enumerate(configs):
+        # 如果没有提供 field_name，则自动生成
+        if not cfg.field_name:
+            field_name = generate_unique_field_name(cfg.display_name, existing_names)
+        else:
+            field_name = cfg.field_name
+        conn.execute(
+            """INSERT INTO field_configs 
+               (category, field_name, display_name, field_type, is_required, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (category, field_name, cfg.display_name, cfg.field_type, cfg.is_required, idx)
+        )
+        # 将新生成的字段名加入列表，防止同一批次内重复
+        existing_names.append(field_name)
+    conn.commit()
+    conn.close()
+    return {"message": "保存成功"}
     conn = get_db()
     conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
     for idx, cfg in enumerate(configs):
@@ -318,3 +361,47 @@ def save_field_configs(category: str, configs: list[FieldConfigItem]):
     conn.commit()
     conn.close()
     return {"message": "保存成功"}
+
+@app.post("/api/field_configs/import_excel")
+async def import_field_configs_from_excel(file: UploadFile = File(...), category: str = None):
+    if not category:
+        raise HTTPException(400, "缺少分类参数")
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(400, "只支持 .xlsx 或 .xls 文件")
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents))
+    ws = wb.active
+    headers = [cell.value for cell in ws[1]]
+    # 期望的表头：显示名称、类型、必填
+    expected = ["显示名称", "类型", "必填"]
+    # 简单的列索引识别
+    col_idx = {}
+    for idx, h in enumerate(headers):
+        if h in expected:
+            col_idx[h] = idx
+    if "显示名称" not in col_idx:
+        raise HTTPException(400, "Excel 缺少“显示名称”列")
+    
+    configs = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not any(row):
+            continue
+        display_name = row[col_idx["显示名称"]]
+        if not display_name:
+            continue
+        field_type = "text"
+        if "类型" in col_idx and row[col_idx["类型"]]:
+            ft = str(row[col_idx["类型"]]).lower()
+            if ft in ["text", "number", "date"]:
+                field_type = ft
+        is_required = False
+        if "必填" in col_idx and row[col_idx["必填"]]:
+            val = str(row[col_idx["必填"]]).lower()
+            is_required = val in ["是", "true", "1", "yes"]
+        configs.append(FieldConfigItem(
+            display_name=display_name,
+            field_type=field_type,
+            is_required=is_required
+        ))
+    # 调用保存函数（复用逻辑）
+    return save_field_configs(category, configs)
