@@ -53,6 +53,7 @@ Pygments @ file:///Users/ec2-user/croot/pygments_1775127038696/work
 PyJWT @ file:///Users/ec2-user/croot/pyjwt_1773773803096/work
 PySocks @ file:///opt/miniconda3/conda-bld/pysocks_1761753010927/work
 python-dotenv @ file:///Users/ec2-user/croot/python-dotenv_1768559692832/work
+python-multipart==0.0.32
 readchar @ file:///opt/miniconda3/conda-bld/readchar_1760613300945/work
 requests @ file:///Users/ec2-user/croot/requests_1775066190620/work
 rich @ file:///opt/miniconda3/conda-bld/rich_1760375480293/work

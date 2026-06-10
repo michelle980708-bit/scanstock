@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: scanstock
+    runtime: python
+    repo: https://github.com/你的用户名/你的仓库名
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: DATABASE_URL
+        # 根据数据库的选择来填写

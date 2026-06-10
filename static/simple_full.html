@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanStock 手机版</title>
+    <style>
+        body { font-family: system-ui; margin: 20px; }
+        input, button { font-size: 1.2em; padding: 8px; margin: 5px 0; width: 100%; }
+        .info { background: #f0f0f0; padding: 10px; border-radius: 8px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>📱 ScanStock 手机测试</h1>
+    <div>
+        <label>🔌 服务器地址:</label>
+        <input type="text" id="serverUrl" placeholder="http://192.168.1.100:8000">
+        <button id="saveUrlBtn">保存</button>
+    </div>
+    <hr>
+    <div>
+        <label>📦 条码:</label>
+        <input type="text" id="barcode" placeholder="扫条码或手动输入" autofocus>
+        <button id="fetchBtn">查询商品</button>
+    </div>
+    <div id="productInfo" class="info">等待查询...</div>
+    <div>
+        <label>🔢 数量:</label>
+        <input type="number" id="quantity" value="1" step="1">
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button id="inboundBtn" style="background:#4CAF50;">入库 +</button>
+        <button id="outboundBtn" style="background:#f44336;">出库 -</button>
+        <button id="checkBtn" style="background:#FF9805;">盘点</button>
+    </div>
+    <div id="result" class="info">等待操作...</div>
+
+    <script>
+        let serverBase = localStorage.getItem('serverBase') || '';
+        const serverInput = document.getElementById('serverUrl');
+        const saveBtn = document.getElementById('saveUrlBtn');
+        const barcodeInput = document.getElementById('barcode');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const productInfoDiv = document.getElementById('productInfo');
+        const quantityInput = document.getElementById('quantity');
+        const inboundBtn = document.getElementById('inboundBtn');
+        const outboundBtn = document.getElementById('outboundBtn');
+        const checkBtn = document.getElementById('checkBtn');
+        const resultDiv = document.getElementById('result');
+
+        // 初始化服务器地址
+        if (serverBase) serverInput.value = serverBase;
+
+        saveBtn.onclick = () => {
+            let url = serverInput.value.trim();
+            if (!url) return;
+            if (!url.startsWith('http')) url = 'http://' + url;
+            serverBase = url;
+            localStorage.setItem('serverBase', serverBase);
+            resultDiv.innerHTML = '<span class="success">✅ 服务器地址已保存</span>';
+            setTimeout(() => { if (resultDiv.innerHTML.includes('已保存')) resultDiv.innerHTML = '等待操作...'; }, 1500);
+        };
+
+        async function apiCall(endpoint, body) {
+            if (!serverBase) {
+                resultDiv.innerHTML = '<span class="error">❌ 请先保存服务器地址</span>';
+                throw new Error('no server');
+            }
+            const res = await fetch(`${serverBase}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || '请求失败');
+            }
+            return await res.json();
+        }
+
+        async function fetchProductInfo(barcode) {
+            if (!serverBase) return;
+            try {
+                const res = await fetch(`${serverBase}/api/products`);
+                const products = await res.json();
+                const product = products.find(p => p.barcode === barcode);
+                if (product) {
+                    productInfoDiv.innerHTML = `
+                        <strong>${product.name}</strong><br>
+                        条码: ${product.barcode}<br>
+                        分类: ${product.category}<br>
+                        当前库存: <span id="currentStock">${product.quantity}</span><br>
+                        位置: ${product.location || '未设置'}
+                    `;
+                } else {
+                    productInfoDiv.innerHTML = '<span class="error">未找到该条码商品</span>';
+                }
+            } catch (e) {
+                productInfoDiv.innerHTML = `<span class="error">查询失败: ${e.message}</span>`;
+            }
+        }
+
+        async function updateStockDisplay(barcode) {
+            if (!barcode) return;
+            try {
+                const res = await fetch(`${serverBase}/api/products`);
+                const products = await res.json();
+                const product = products.find(p => p.barcode === barcode);
+                if (product) {
+                    const stockSpan = document.getElementById('currentStock');
+                    if (stockSpan) stockSpan.innerText = product.quantity;
+                    else fetchProductInfo(barcode); // 重新拉取
+                }
+            } catch(e) {}
+        }
+
+        fetchBtn.onclick = async () => {
+            const barcode = barcodeInput.value.trim();
+            if (!barcode) return;
+            await fetchProductInfo(barcode);
+        };
+
+        barcodeInput.addEventListener('change', () => {
+            const barcode = barcodeInput.value.trim();
+            if (barcode) fetchProductInfo(barcode);
+        });
+
+        inboundBtn.onclick = async () => {
+            const barcode = barcodeInput.value.trim();
+            const quantity = parseInt(quantityInput.value, 10);
+            if (!barcode) { resultDiv.innerHTML = '<span class="error">请输入条码</span>'; return; }
+            if (isNaN(quantity) || quantity <= 0) { resultDiv.innerHTML = '<span class="error">数量必须为正数</span>'; return; }
+            resultDiv.innerHTML = '⏳ 处理中...';
+            try {
+                const data = await apiCall('/api/inbound', { barcode, quantity, reason: '手机入库' });
+                resultDiv.innerHTML = `<span class="success">✅ 入库成功，新库存: ${data.new_quantity}</span>`;
+                await updateStockDisplay(barcode);
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
+            }
+        };
+
+        outboundBtn.onclick = async () => {
+            const barcode = barcodeInput.value.trim();
+            const quantity = parseInt(quantityInput.value, 10);
+            if (!barcode) { resultDiv.innerHTML = '<span class="error">请输入条码</span>'; return; }
+            if (isNaN(quantity) || quantity <= 0) { resultDiv.innerHTML = '<span class="error">数量必须为正数</span>'; return; }
+            resultDiv.innerHTML = '⏳ 处理中...';
+            try {
+                const data = await apiCall('/api/outbound', { barcode, quantity, reason: '手机出库' });
+                resultDiv.innerHTML = `<span class="success">✅ 出库成功，新库存: ${data.new_quantity}</span>`;
+                await updateStockDisplay(barcode);
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
+            }
+        };
+
+        checkBtn.onclick = async () => {
+            const barcode = barcodeInput.value.trim();
+            let actualQty = prompt('请输入实际盘点数量', '0');
+            if (actualQty === null) return;
+            actualQty = parseInt(actualQty, 10);
+            if (isNaN(actualQty)) return;
+            resultDiv.innerHTML = '⏳ 处理中...';
+            try {
+                const data = await apiCall('/api/check', { barcode, actual_quantity: actualQty, reason: '手机盘点' });
+                resultDiv.innerHTML = `<span class="success">✅ 盘点完成，差异: ${data.difference}</span>`;
+                await updateStockDisplay(barcode);
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
+            }
+        };
+    </script>
+</body>
+</html>
