@@ -1,177 +1,433 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScanStock 手机版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>ScanStock 库存管理</title>
     <style>
-        body { font-family: system-ui; margin: 20px; }
-        input, button { font-size: 1.2em; padding: 8px; margin: 5px 0; width: 100%; }
-        .info { background: #f0f0f0; padding: 10px; border-radius: 8px; margin: 10px 0; }
-        .success { color: green; }
-        .error { color: red; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f5f7fb;
+            margin: 0;
+            padding: 16px;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        h1 { font-size: 1.8rem; margin: 0 0 8px 0; font-weight: 600; }
+        .sub { color: #6b7280; margin-bottom: 20px; font-size: 0.9rem; }
+        .input-group { margin-bottom: 16px; }
+        label { font-weight: 500; display: block; margin-bottom: 6px; font-size: 0.9rem; }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            font-size: 1rem;
+            background: white;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 500;
+            width: 100%;
+            margin-top: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:active { background-color: #2563eb; }
+        .btn-outline {
+            background: white;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+        }
+        .btn-outline:active { background: #eff6ff; }
+        .flex-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .flex-row button { flex: 1; }
+        .stock-info {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 12px;
+            border-radius: 12px;
+            margin: 16px 0;
+            font-size: 0.95rem;
+        }
+        .error { background: #fee2e2; border-left-color: #ef4444; color: #b91c1c; }
+        .result-area {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        hr { margin: 20px 0; border: none; border-top: 1px solid #e5e7eb; }
+        .badge {
+            display: inline-block;
+            background: #e5e7eb;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .toolbar button {
+            flex: 1;
+            margin-top: 0;
+            background-color: #4b5563;
+        }
+        .toolbar button.export { background-color: #10b981; }
+        .toolbar button.import { background-color: #3b82f6; }
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
-    <h1>📱 ScanStock 手机测试</h1>
-    <div>
-        <label>🔌 服务器地址:</label>
-        <input type="text" id="serverUrl" placeholder="http://192.168.1.100:8000">
-        <button id="saveUrlBtn">保存</button>
-    </div>
-    <hr>
-    <div>
-        <label>📦 条码:</label>
-        <input type="text" id="barcode" placeholder="扫条码或手动输入" autofocus>
-        <button id="fetchBtn">查询商品</button>
-    </div>
-    <div id="productInfo" class="info">等待查询...</div>
-    <div>
-        <label>🔢 数量:</label>
-        <input type="number" id="quantity" value="1" step="1">
-    </div>
-    <div style="display: flex; gap: 10px;">
-        <button id="inboundBtn" style="background:#4CAF50;">入库 +</button>
-        <button id="outboundBtn" style="background:#f44336;">出库 -</button>
-        <button id="checkBtn" style="background:#FF9805;">盘点</button>
-    </div>
-    <div id="result" class="info">等待操作...</div>
+<div class="container">
+    <div class="card">
+        <h1>📦 ScanStock</h1>
+        <div class="sub">手机/电脑通用版 · 扫码出入库/盘点</div>
 
-    <script>
-        let serverBase = localStorage.getItem('serverBase') || '';
-        const serverInput = document.getElementById('serverUrl');
-        const saveBtn = document.getElementById('saveUrlBtn');
-        const barcodeInput = document.getElementById('barcode');
-        const fetchBtn = document.getElementById('fetchBtn');
-        const productInfoDiv = document.getElementById('productInfo');
-        const quantityInput = document.getElementById('quantity');
-        const inboundBtn = document.getElementById('inboundBtn');
-        const outboundBtn = document.getElementById('outboundBtn');
-        const checkBtn = document.getElementById('checkBtn');
-        const resultDiv = document.getElementById('result');
+        <!-- 服务器设置 -->
+        <details>
+            <summary style="cursor:pointer; margin-bottom:12px;">⚙️ 服务器设置</summary>
+            <div class="input-group">
+                <label>后端 API 地址</label>
+                <input type="text" id="apiBaseUrl" placeholder="https://scanstock-xxx.onrender.com" value="https://scanstock-1p66.onrender.com">
+                <button id="saveServerBtn" class="btn-outline" style="margin-top:8px;">保存并重试</button>
+            </div>
+        </details>
 
-        // 初始化服务器地址
-        if (serverBase) serverInput.value = serverBase;
+        <!-- 导入导出工具栏 -->
+        <div class="toolbar">
+            <button id="exportBtn" class="export">📎 导出 Excel</button>
+            <button id="importBtn" class="import">📂 导入 Excel</button>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
+        </div>
 
-        saveBtn.onclick = () => {
-            let url = serverInput.value.trim();
-            if (!url) return;
-            if (!url.startsWith('http')) url = 'http://' + url;
-            serverBase = url;
-            localStorage.setItem('serverBase', serverBase);
-            resultDiv.innerHTML = '<span class="success">✅ 服务器地址已保存</span>';
-            setTimeout(() => { if (resultDiv.innerHTML.includes('已保存')) resultDiv.innerHTML = '等待操作...'; }, 1500);
-        };
+        <!-- 条码输入 -->
+        <div class="input-group">
+            <label>📷 条码 / 手动输入</label>
+            <input type="text" id="barcodeInput" placeholder="扫描或输入条码" autocomplete="off">
+            <button id="scanBtn" style="margin-top:8px;">📷 模拟扫码（调用摄像头）</button>
+            <p class="sub" style="margin-top:6px;">注：浏览器需支持 HTTPS 才可调用摄像头，否则请手动输入条码。</p>
+        </div>
 
-        async function apiCall(endpoint, body) {
-            if (!serverBase) {
-                resultDiv.innerHTML = '<span class="error">❌ 请先保存服务器地址</span>';
-                throw new Error('no server');
+        <!-- 操作按钮组 -->
+        <div class="flex-row">
+            <button id="inboundBtn">📥 入库 +</button>
+            <button id="outboundBtn">📤 出库 -</button>
+            <button id="checkBtn">🔍 盘点</button>
+        </div>
+
+        <div class="input-group" style="margin-top:12px;">
+            <label>数量</label>
+            <input type="number" id="quantityInput" value="1" step="1" min="1">
+        </div>
+        <div class="input-group" id="checkQuantityGroup" style="display:none;">
+            <label>📊 实际盘点数量</label>
+            <input type="number" id="actualQuantityInput" value="0" step="1">
+        </div>
+        <div class="input-group">
+            <label>备注（可选）</label>
+            <input type="text" id="reasonInput" placeholder="例如：补货、领用、盘点调整">
+        </div>
+
+        <div id="resultArea" class="result-area">等待操作...</div>
+    </div>
+
+    <!-- 商品信息卡片 -->
+    <div class="card" id="productInfoCard" style="display:none;">
+        <div style="display: flex; justify-content: space-between;">
+            <strong>📄 商品信息</strong>
+            <span class="badge" id="productCategoryBadge"></span>
+        </div>
+        <div id="productDetail"></div>
+        <hr>
+        <div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
+    </div>
+
+    <!-- 库存表格（可选显示） -->
+    <div class="card" id="stockTableCard">
+        <strong>📋 当前库存列表</strong>
+        <div class="table-wrapper">
+            <table id="stockTable">
+                <thead>
+                    <tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></tr>
+                </thead>
+                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</td></tr></tbody>
+            </table>
+        </div>
+        <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
+    </div>
+</div>
+
+<script>
+    // DOM 元素
+    const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+    const saveServerBtn = document.getElementById('saveServerBtn');
+    const barcodeInput = document.getElementById('barcodeInput');
+    const scanBtn = document.getElementById('scanBtn');
+    const inboundBtn = document.getElementById('inboundBtn');
+    const outboundBtn = document.getElementById('outboundBtn');
+    const checkBtn = document.getElementById('checkBtn');
+    const quantityInput = document.getElementById('quantityInput');
+    const actualQuantityInput = document.getElementById('actualQuantityInput');
+    const reasonInput = document.getElementById('reasonInput');
+    const resultArea = document.getElementById('resultArea');
+    const productInfoCard = document.getElementById('productInfoCard');
+    const productDetail = document.getElementById('productDetail');
+    const productQuantitySpan = document.getElementById('productQuantity');
+    const productCategoryBadge = document.getElementById('productCategoryBadge');
+    const checkQuantityGroup = document.getElementById('checkQuantityGroup');
+    const stockTableBody = document.getElementById('stockTableBody');
+    const refreshTableBtn = document.getElementById('refreshTableBtn');
+
+    let currentMode = 'inbound';
+    let currentProduct = null;
+    let serverBase = localStorage.getItem('apiBaseUrl') || apiBaseUrlInput.value;
+    if (serverBase) apiBaseUrlInput.value = serverBase;
+
+    function saveServerUrl() {
+        let url = apiBaseUrlInput.value.trim();
+        if (!url) return;
+        serverBase = url;
+        localStorage.setItem('apiBaseUrl', serverBase);
+        showResult('✅ 服务器地址已保存', 'success');
+        loadStockTable();
+    }
+
+    saveServerBtn.onclick = saveServerUrl;
+
+    function showResult(msg, type) {
+        resultArea.innerHTML = `<div style="color:${type === 'error' ? 'red' : 'green'}">${msg}</div>`;
+        setTimeout(() => {
+            if (resultArea.innerHTML.includes(msg)) resultArea.innerHTML = '等待操作...';
+        }, 3000);
+    }
+
+    async function fetchProduct(barcode) {
+        if (!serverBase) throw new Error('请先保存服务器地址');
+        const res = await fetch(`${serverBase}/api/products`);
+        if (!res.ok) throw new Error('获取商品列表失败');
+        const products = await res.json();
+        return products.find(p => p.barcode === barcode);
+    }
+
+    async function updateProductInfo(barcode) {
+        if (!barcode) { productInfoCard.style.display = 'none'; return; }
+        try {
+            const product = await fetchProduct(barcode);
+            if (product) {
+                currentProduct = product;
+                productDetail.innerHTML = `
+                    <div><strong>名称:</strong> ${escapeHtml(product.name)}</div>
+                    <div><strong>条码:</strong> ${escapeHtml(product.barcode)}</div>
+                    <div><strong>分类:</strong> ${escapeHtml(product.category)}</div>
+                    <div><strong>位置:</strong> ${escapeHtml(product.location || '未设置')}</div>
+                `;
+                productQuantitySpan.innerText = product.quantity;
+                productCategoryBadge.innerText = product.category;
+                productInfoCard.style.display = 'block';
+            } else {
+                productInfoCard.style.display = 'none';
+                showResult(`⚠️ 未找到条码: ${barcode}`, 'error');
             }
+        } catch (err) {
+            showResult(`连接失败: ${err.message}`, 'error');
+        }
+    }
+
+    let barcodeTimer;
+    barcodeInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (barcodeTimer) clearTimeout(barcodeTimer);
+        barcodeTimer = setTimeout(() => {
+            if (val) updateProductInfo(val);
+            else productInfoCard.style.display = 'none';
+        }, 500);
+    });
+
+    scanBtn.onclick = () => {
+        barcodeInput.focus();
+        alert('请使用设备的扫码功能扫描条码，或将光标放在条码输入框后扫码枪输入。');
+    };
+
+    function setMode(mode) {
+        currentMode = mode;
+        checkQuantityGroup.style.display = mode === 'check' ? 'block' : 'none';
+    }
+    inboundBtn.onclick = () => setMode('inbound');
+    outboundBtn.onclick = () => setMode('outbound');
+    checkBtn.onclick = () => setMode('check');
+
+    async function performAction() {
+        const barcode = barcodeInput.value.trim();
+        if (!barcode) { showResult('请输入或扫描条码', 'error'); return; }
+        const reason = reasonInput.value.trim();
+        let endpoint = '', body = { barcode, reason };
+        if (currentMode === 'inbound') {
+            const qty = parseInt(quantityInput.value, 10);
+            if (isNaN(qty) || qty <= 0) { showResult('入库数量必须为正数', 'error'); return; }
+            endpoint = '/api/inbound';
+            body.quantity = qty;
+        } else if (currentMode === 'outbound') {
+            const qty = parseInt(quantityInput.value, 10);
+            if (isNaN(qty) || qty <= 0) { showResult('出库数量必须为正数', 'error'); return; }
+            endpoint = '/api/outbound';
+            body.quantity = qty;
+        } else if (currentMode === 'check') {
+            let actualQty = parseInt(actualQuantityInput.value, 10);
+            if (isNaN(actualQty)) actualQty = 0;
+            endpoint = '/api/check';
+            body.actual_quantity = actualQty;
+        } else return;
+
+        showResult('⏳ 处理中...', '');
+        try {
             const res = await fetch(`${serverBase}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || '请求失败');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '请求失败');
+            await updateProductInfo(barcode);
+            let msg = '';
+            if (currentMode === 'inbound') msg = `✅ 入库成功，新库存: ${data.new_quantity}`;
+            else if (currentMode === 'outbound') msg = `✅ 出库成功，新库存: ${data.new_quantity}`;
+            else if (currentMode === 'check') msg = `✅ 盘点记录已保存，差异: ${data.diff}`;
+            showResult(msg, 'success');
+            loadStockTable(); // 刷新列表
+        } catch (err) {
+            showResult(`❌ 错误: ${err.message}`, 'error');
+        }
+    }
+
+    // 添加执行按钮
+    const actionBtn = document.createElement('button');
+    actionBtn.innerText = '▶️ 执行操作';
+    actionBtn.style.backgroundColor = '#10b981';
+    actionBtn.style.marginTop = '16px';
+    actionBtn.onclick = performAction;
+    document.querySelector('.card').insertBefore(actionBtn, document.getElementById('resultArea'));
+
+    // 加载库存列表表格
+    async function loadStockTable() {
+        if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
+        try {
+            const res = await fetch(`${serverBase}/api/products`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const products = await res.json();
+            if (products.length === 0) { stockTableBody.innerHTML = '<tr><td colspan="5">暂无商品数据</td></tr>'; return; }
+            let html = '';
+            for (const p of products) {
+                html += `<tr>
+                    <td>${escapeHtml(p.barcode)}</td>
+                    <td>${escapeHtml(p.name)}</td>
+                    <td>${escapeHtml(p.category)}</td>
+                    <td>${p.quantity}</td>
+                    <td>${escapeHtml(p.location || '-')}</td>
+                </tr>`;
             }
-            return await res.json();
+            stockTableBody.innerHTML = html;
+        } catch (err) {
+            stockTableBody.innerHTML = `<tr><td colspan="5">加载失败: ${err.message}</td></tr>`;
         }
+    }
+    refreshTableBtn.onclick = loadStockTable;
 
-        async function fetchProductInfo(barcode) {
-            if (!serverBase) return;
-            try {
-                const res = await fetch(`${serverBase}/api/products`);
-                const products = await res.json();
-                const product = products.find(p => p.barcode === barcode);
-                if (product) {
-                    productInfoDiv.innerHTML = `
-                        <strong>${product.name}</strong><br>
-                        条码: ${product.barcode}<br>
-                        分类: ${product.category}<br>
-                        当前库存: <span id="currentStock">${product.quantity}</span><br>
-                        位置: ${product.location || '未设置'}
-                    `;
-                } else {
-                    productInfoDiv.innerHTML = '<span class="error">未找到该条码商品</span>';
-                }
-            } catch (e) {
-                productInfoDiv.innerHTML = `<span class="error">查询失败: ${e.message}</span>`;
+    // Excel 导入导出
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+
+    exportBtn.onclick = () => {
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
+        window.location.href = `${serverBase}/api/export/excel`;
+    };
+    importBtn.onclick = () => excelFileInput.click();
+    excelFileInput.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch(`${serverBase}/api/import/excel`, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (res.ok) {
+                alert(result.message + (result.errors ? '\n错误行:\n' + result.errors.join('\n') : ''));
+                loadStockTable();
+                if (barcodeInput.value.trim()) updateProductInfo(barcodeInput.value.trim());
+            } else {
+                alert('导入失败：' + (result.detail || '未知错误'));
             }
+        } catch (err) {
+            alert('网络错误：' + err.message);
         }
+        excelFileInput.value = '';
+    };
 
-        async function updateStockDisplay(barcode) {
-            if (!barcode) return;
-            try {
-                const res = await fetch(`${serverBase}/api/products`);
-                const products = await res.json();
-                const product = products.find(p => p.barcode === barcode);
-                if (product) {
-                    const stockSpan = document.getElementById('currentStock');
-                    if (stockSpan) stockSpan.innerText = product.quantity;
-                    else fetchProductInfo(barcode); // 重新拉取
-                }
-            } catch(e) {}
-        }
-
-        fetchBtn.onclick = async () => {
-            const barcode = barcodeInput.value.trim();
-            if (!barcode) return;
-            await fetchProductInfo(barcode);
-        };
-
-        barcodeInput.addEventListener('change', () => {
-            const barcode = barcodeInput.value.trim();
-            if (barcode) fetchProductInfo(barcode);
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
         });
+    }
 
-        inboundBtn.onclick = async () => {
-            const barcode = barcodeInput.value.trim();
-            const quantity = parseInt(quantityInput.value, 10);
-            if (!barcode) { resultDiv.innerHTML = '<span class="error">请输入条码</span>'; return; }
-            if (isNaN(quantity) || quantity <= 0) { resultDiv.innerHTML = '<span class="error">数量必须为正数</span>'; return; }
-            resultDiv.innerHTML = '⏳ 处理中...';
-            try {
-                const data = await apiCall('/api/inbound', { barcode, quantity, reason: '手机入库' });
-                resultDiv.innerHTML = `<span class="success">✅ 入库成功，新库存: ${data.new_quantity}</span>`;
-                await updateStockDisplay(barcode);
-            } catch (err) {
-                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
-            }
-        };
-
-        outboundBtn.onclick = async () => {
-            const barcode = barcodeInput.value.trim();
-            const quantity = parseInt(quantityInput.value, 10);
-            if (!barcode) { resultDiv.innerHTML = '<span class="error">请输入条码</span>'; return; }
-            if (isNaN(quantity) || quantity <= 0) { resultDiv.innerHTML = '<span class="error">数量必须为正数</span>'; return; }
-            resultDiv.innerHTML = '⏳ 处理中...';
-            try {
-                const data = await apiCall('/api/outbound', { barcode, quantity, reason: '手机出库' });
-                resultDiv.innerHTML = `<span class="success">✅ 出库成功，新库存: ${data.new_quantity}</span>`;
-                await updateStockDisplay(barcode);
-            } catch (err) {
-                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
-            }
-        };
-
-        checkBtn.onclick = async () => {
-            const barcode = barcodeInput.value.trim();
-            let actualQty = prompt('请输入实际盘点数量', '0');
-            if (actualQty === null) return;
-            actualQty = parseInt(actualQty, 10);
-            if (isNaN(actualQty)) return;
-            resultDiv.innerHTML = '⏳ 处理中...';
-            try {
-                const data = await apiCall('/api/check', { barcode, actual_quantity: actualQty, reason: '手机盘点' });
-                resultDiv.innerHTML = `<span class="success">✅ 盘点完成，差异: ${data.difference}</span>`;
-                await updateStockDisplay(barcode);
-            } catch (err) {
-                resultDiv.innerHTML = `<span class="error">❌ 错误: ${err.message}</span>`;
-            }
-        };
-    </script>
+    // 初始化
+    loadStockTable();
+    setMode('inbound');
+    inboundBtn.style.backgroundColor = '#2563eb';
+    outboundBtn.style.backgroundColor = '#3b82f6';
+    checkBtn.style.backgroundColor = '#3b82f6';
+    inboundBtn.onclick = () => { setMode('inbound'); inboundBtn.style.backgroundColor = '#2563eb'; outboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
+    outboundBtn.onclick = () => { setMode('outbound'); outboundBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; checkBtn.style.backgroundColor = '#3b82f6'; };
+    checkBtn.onclick = () => { setMode('check'); checkBtn.style.backgroundColor = '#2563eb'; inboundBtn.style.backgroundColor = '#3b82f6'; outboundBtn.style.backgroundColor = '#3b82f6'; };
+</script>
 </body>
 </html>
