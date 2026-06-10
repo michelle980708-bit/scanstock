@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 
 import openpyxl
+import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -235,6 +236,9 @@ def export_products_to_excel(category: str = None):
 async def import_products_from_excel(file: UploadFile = File(...), category: str = None):
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(400, "只支持 .xlsx 或 .xls 文件")
+    df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
+    # 将 NaN 替换为空字符串
+    df = df.fillna("")
     contents = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(contents))
     ws = wb.active
@@ -324,6 +328,60 @@ def save_field_configs(category: str, configs: list[FieldConfigItem]):
 
 @app.post("/api/field_configs/import_excel")
 async def import_field_configs_from_excel(file: UploadFile = File(...), category: str = None):
+    if not category:
+        raise HTTPException(400, "缺少分类参数")
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(400, "只支持 .xlsx 或 .xls 文件")
+    try:
+        # 读取 Excel 文件到 DataFrame
+        contents = await file.read()
+        # 使用 pandas 读取，它会自动处理编码问题
+        df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
+        
+        # 检查必要的列
+        required_col = "显示名称"
+        if required_col not in df.columns:
+            raise HTTPException(400, f"Excel 缺少“{required_col}”列")
+        
+        configs = []
+        for idx, row in df.iterrows():
+            display_name = str(row.get("显示名称", "")).strip()
+            if not display_name:
+                continue
+            field_type = "text"
+            if "类型" in df.columns and pd.notna(row.get("类型")):
+                ft = str(row["类型"]).lower()
+                if ft in ["text", "number", "date"]:
+                    field_type = ft
+            is_required = False
+            if "必填" in df.columns and pd.notna(row.get("必填")):
+                val = str(row["必填"]).lower()
+                is_required = val in ["是", "true", "1", "yes"]
+            configs.append(FieldConfigItem(
+                display_name=display_name,
+                field_type=field_type,
+                is_required=is_required
+            ))
+        
+        # 保存配置到数据库（复用原有逻辑）
+        conn = get_db()
+        existing = conn.execute("SELECT field_name FROM field_configs WHERE category = ?", (category,)).fetchall()
+        existing_names = [r["field_name"] for r in existing]
+        conn.execute("DELETE FROM field_configs WHERE category = ?", (category,))
+        for idx, cfg in enumerate(configs):
+            field_name = generate_field_name(cfg.display_name, existing_names)
+            conn.execute(
+                "INSERT INTO field_configs (category, field_name, display_name, field_type, is_required, sort_order) VALUES (?,?,?,?,?,?)",
+                (category, field_name, cfg.display_name, cfg.field_type, 1 if cfg.is_required else 0, idx)
+            )
+            existing_names.append(field_name)
+        conn.commit()
+        conn.close()
+        return {"message": f"导入成功，共 {len(configs)} 个字段"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=f"导入失败: {str(e)}")
     if not category:
         raise HTTPException(400, "缺少分类参数")
     if not file.filename.endswith(('.xlsx', '.xls')):
