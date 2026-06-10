@@ -299,13 +299,6 @@ async def import_products_from_excel(file: UploadFile = File(...), category: str
     return {"message": f"导入完成，成功 {success_count} 条", "errors": error_rows or None}
 
 # ---------- 字段配置 API ----------
-@app.get("/api/field_configs/{category}")
-def get_field_configs(category: str):
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
-    conn.close()
-    return [{"display_name": r["display_name"], "field_type": r["field_type"], "is_required": bool(r["is_required"])} for r in rows]
-
 @app.post("/api/field_configs/{category}")
 def save_field_configs(category: str, configs: list[FieldConfigItem]):
     try:
@@ -468,3 +461,10 @@ def download_field_config_template():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=field_config_template.xlsx"}
     )
+
+@app.get("/api/field_configs/{category}")
+def get_field_configs(category: str):
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM field_configs WHERE category = ? ORDER BY sort_order", (category,)).fetchall()
+    conn.close()
+    return [{"display_name": r["display_name"], "field_type": r["field_type"], "is_required": bool(r["is_required"])} for r in rows]
