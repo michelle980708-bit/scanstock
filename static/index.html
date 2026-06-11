@@ -175,6 +175,7 @@
     currentCategorySelect.value = currentCategory;
     currentCategoryLabelSpan.innerText = currentCategory;
 
+    // 保存服务器地址
     function saveServerUrl() {
         let url = apiBaseUrlInput.value.trim();
         if (!url) return;
@@ -187,7 +188,9 @@
 
     function showResult(msg, type) {
         resultArea.innerHTML = `<div style="color:${type === 'error' ? 'red' : 'green'}">${msg}</div>`;
-        setTimeout(() => { if (resultArea.innerHTML.includes(msg)) resultArea.innerHTML = '等待操作...'; }, 3000);
+        setTimeout(() => {
+            if (resultArea.innerHTML.includes(msg)) resultArea.innerHTML = '等待操作...';
+        }, 3000);
     }
 
     async function fetchAllProducts() {
@@ -396,7 +399,7 @@
         });
     }
 
-    // 字段配置模态框
+    // ========== 字段配置模态框（修正移动和复选框状态） ==========
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -433,6 +436,7 @@
         }
     }
 
+    // 渲染字段表格，正确设置列表显示复选框
     function renderFieldTable(configs) {
         fieldTableBody.innerHTML = '';
         if (!configs || configs.length === 0) {
@@ -470,22 +474,22 @@
             chkRequired.type = 'checkbox';
             chkRequired.checked = cfg.is_required;
             cell2.appendChild(chkRequired);
-            // 列表显示
+            // 列表显示 - 关键：根据后端返回的 show_in_list 设置 checked
             const cell3 = row.insertCell(3);
             const chkShow = document.createElement('input');
             chkShow.type = 'checkbox';
-            chkShow.checked = cfg.show_in_list;
+            chkShow.checked = cfg.show_in_list === true;  // 确保布尔值
             cell3.appendChild(chkShow);
             // 排序按钮
             const cell4 = row.insertCell(4);
             const upBtn = document.createElement('button');
             upBtn.textContent = '↑';
             upBtn.className = 'move-btn';
-            upBtn.onclick = (function(r) { return function() { moveRow(r, -1); }; })(row);
+            upBtn.onclick = (e) => { e.stopPropagation(); moveRow(row, -1); };
             const downBtn = document.createElement('button');
             downBtn.textContent = '↓';
             downBtn.className = 'move-btn';
-            downBtn.onclick = (function(r) { return function() { moveRow(r, 1); }; })(row);
+            downBtn.onclick = (e) => { e.stopPropagation(); moveRow(row, 1); };
             cell4.appendChild(upBtn);
             cell4.appendChild(downBtn);
             // 删除
@@ -494,9 +498,9 @@
             delBtn.textContent = '删除';
             delBtn.className = 'delete-btn';
             delBtn.style.backgroundColor = '#ef4444';
-            delBtn.onclick = (function(r) { return function() { r.remove(); checkDuplicateNames(); }; })(row);
+            delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
             cell5.appendChild(delBtn);
-            // 存储引用
+            // 存储引用（可选）
             row._data = { displayNameInput, typeSelect, chkRequired, chkShow };
         }
         checkDuplicateNames();
@@ -540,16 +544,22 @@
         }
     }
 
-    function moveRow(row, dir) {
-        const parent = row.parentNode;
-        const rows = Array.from(parent.children);
+    // 修正移动行逻辑
+    function moveRow(row, direction) {
+        const rows = Array.from(fieldTableBody.rows);
         const idx = rows.indexOf(row);
-        const newIdx = idx + dir;
+        if (idx === -1) return;
+        const newIdx = idx + direction;
         if (newIdx < 0 || newIdx >= rows.length) return;
-        if (dir === -1) {
-            parent.insertBefore(row, rows[newIdx]);
+        // 交换 DOM 位置
+        if (direction === -1) {
+            fieldTableBody.insertBefore(row, rows[newIdx]);
         } else {
-            parent.insertBefore(row, rows[newIdx + 1]);
+            if (newIdx === rows.length - 1) {
+                fieldTableBody.appendChild(row);
+            } else {
+                fieldTableBody.insertBefore(row, rows[newIdx + 1]);
+            }
         }
         checkDuplicateNames();
     }
@@ -575,12 +585,22 @@
         chkShow.type = 'checkbox';
         cell3.appendChild(chkShow);
         const cell4 = row.insertCell(4);
-        const upBtn = document.createElement('button'); upBtn.textContent='↑'; upBtn.className='move-btn'; upBtn.onclick = (function(r){ return function(){ moveRow(r, -1); }; })(row);
-        const downBtn = document.createElement('button'); downBtn.textContent='↓'; downBtn.className='move-btn'; downBtn.onclick = (function(r){ return function(){ moveRow(r, 1); }; })(row);
-        cell4.appendChild(upBtn); cell4.appendChild(downBtn);
+        const upBtn = document.createElement('button');
+        upBtn.textContent='↑';
+        upBtn.className='move-btn';
+        upBtn.onclick = (e) => { e.stopPropagation(); moveRow(row, -1); };
+        const downBtn = document.createElement('button');
+        downBtn.textContent='↓';
+        downBtn.className='move-btn';
+        downBtn.onclick = (e) => { e.stopPropagation(); moveRow(row, 1); };
+        cell4.appendChild(upBtn);
+        cell4.appendChild(downBtn);
         const cell5 = row.insertCell(5);
-        const delBtn = document.createElement('button'); delBtn.textContent='删除'; delBtn.className='delete-btn'; delBtn.style.backgroundColor='#ef4444';
-        delBtn.onclick = (function(r){ return function(){ r.remove(); checkDuplicateNames(); }; })(row);
+        const delBtn = document.createElement('button');
+        delBtn.textContent='删除';
+        delBtn.className='delete-btn';
+        delBtn.style.backgroundColor='#ef4444';
+        delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
         cell5.appendChild(delBtn);
         row._data = { displayNameInput: inpName, typeSelect: typeSel, chkRequired: chkReq, chkShow: chkShow };
         checkDuplicateNames();
@@ -621,12 +641,7 @@
             const result = await res.json();
             alert(result.message);
             configModal.style.display = 'none';
-            // 刷新库存列表以反映最新的列表显示设置
-            await loadStockTable();
-            // 如果当前有显示商品卡片，也刷新一下
-            if (barcodeInput.value.trim()) {
-                await updateProductInfo(barcodeInput.value.trim());
-            }
+            loadStockTable(); // 刷新列表（列可能变化）
         } catch (err) {
             alert('保存失败：' + err.message);
         }
