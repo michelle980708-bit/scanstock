@@ -6,205 +6,52 @@
     <title>ScanStock 库存管理</title>
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: #f5f7fb;
-            margin: 0;
-            padding: 16px;
-            color: #1f2937;
-        }
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f5f7fb; margin: 0; padding: 16px; color: #1f2937; }
         .container { max-width: 700px; margin: 0 auto; }
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
+        .card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h1 { font-size: 1.8rem; margin: 0 0 8px 0; font-weight: 600; }
         .sub { color: #6b7280; margin-bottom: 20px; font-size: 0.9rem; }
         .input-group { margin-bottom: 16px; }
         label { font-weight: 500; display: block; margin-bottom: 6px; font-size: 0.9rem; }
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            font-size: 1rem;
-            background: white;
-        }
-        button {
-            background-color: #3b82f6;
-            color: white;
-            border: none;
-            padding: 12px 16px;
-            border-radius: 40px;
-            font-size: 1rem;
-            font-weight: 500;
-            width: 100%;
-            margin-top: 8px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
+        input, select { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 12px; font-size: 1rem; background: white; }
+        button { background-color: #3b82f6; color: white; border: none; padding: 12px 16px; border-radius: 40px; font-size: 1rem; font-weight: 500; width: 100%; margin-top: 8px; cursor: pointer; transition: background 0.2s; }
         button:active { background-color: #2563eb; }
-        .btn-outline {
-            background: white;
-            border: 1px solid #3b82f6;
-            color: #3b82f6;
-        }
-        .btn-outline:active { background: #eff6ff; }
+        .btn-outline { background: white; border: 1px solid #3b82f6; color: #3b82f6; }
         .flex-row { display: flex; gap: 12px; flex-wrap: wrap; }
         .flex-row button { flex: 1; }
-        .stock-info {
-            background: #f0fdf4;
-            border-left: 4px solid #22c55e;
-            padding: 12px;
-            border-radius: 12px;
-            margin: 16px 0;
-            font-size: 0.95rem;
-        }
-        .error { background: #fee2e2; border-left-color: #ef4444; color: #b91c1c; }
-        .result-area {
-            margin-top: 16px;
-            padding: 12px;
-            background: #f9fafb;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            word-break: break-all;
-        }
+        .result-area { margin-top: 16px; padding: 12px; background: #f9fafb; border-radius: 12px; font-size: 0.9rem; word-break: break-all; }
         hr { margin: 20px 0; border: none; border-top: 1px solid #e5e7eb; }
-        .badge {
-            display: inline-block;
-            background: #e5e7eb;
-            padding: 4px 10px;
-            border-radius: 30px;
-            font-size: 0.75rem;
-        }
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-        .toolbar button {
-            flex: 1;
-            margin-top: 0;
-            background-color: #4b5563;
-        }
+        .badge { display: inline-block; background: #e5e7eb; padding: 4px 10px; border-radius: 30px; font-size: 0.75rem; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .toolbar button { flex: 1; margin-top: 0; background-color: #4b5563; }
         .toolbar button.export { background-color: #10b981; }
         .toolbar button.import { background-color: #3b82f6; }
         .toolbar button.config { background-color: #8b5cf6; }
-        .category-selector {
-            background: #f9fafb;
-            border-radius: 16px;
-            padding: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .category-selector label {
-            margin-bottom: 0;
-            font-weight: 600;
-        }
-        .category-selector select {
-            width: auto;
-            flex: 2;
-            min-width: 120px;
-        }
-        .category-selector button {
-            width: auto;
-            margin-top: 0;
-            padding: 8px 16px;
-        }
-        .table-wrapper {
-            overflow-x: auto;
-            margin-top: 12px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        th, td {
-            border: 1px solid #e5e7eb;
-            padding: 8px;
-            text-align: left;
-            vertical-align: middle;
-        }
+        .category-selector { background: #f9fafb; border-radius: 16px; padding: 12px; margin-bottom: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .category-selector label { margin-bottom: 0; font-weight: 600; }
+        .category-selector select { width: auto; flex: 2; min-width: 120px; }
+        .category-selector button { width: auto; margin-top: 0; padding: 8px 16px; }
+        .table-wrapper { overflow-x: auto; margin-top: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: middle; }
         th { background-color: #f9fafb; font-weight: 600; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            margin: 50px auto;
-            max-width: 800px;
-            padding: 20px;
-            border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        .field-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .field-table th, .field-table td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            vertical-align: middle;
-        }
-        .field-table input, .field-table select {
-            width: 100%;
-            padding: 6px;
-            margin: 0;
-        }
-        .field-table .move-btn {
-            width: 30px;
-            padding: 4px;
-            margin: 2px;
-            background-color: #6b7280;
-        }
-        .field-table .delete-btn {
-            background-color: #ef4444;
-            padding: 6px 10px;
-        }
-        .duplicate-warning {
-            color: #ef4444;
-            font-size: 0.8rem;
-            margin-left: 5px;
-        }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 50px auto; max-width: 800px; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto; }
+        .field-table { width: 100%; border-collapse: collapse; }
+        .field-table th, .field-table td { border: 1px solid #ccc; padding: 8px; vertical-align: middle; }
+        .field-table input, .field-table select { width: 100%; padding: 6px; margin: 0; }
+        .field-table .move-btn { width: 30px; padding: 4px; margin: 2px; background-color: #6b7280; }
+        .field-table .delete-btn { background-color: #ef4444; padding: 6px 10px; }
+        .duplicate-warning { color: #ef4444; font-size: 0.8rem; margin-left: 5px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
-        .quick-add-buttons {
-            margin: 12px 0;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .quick-add-buttons button {
-            width: auto;
-            padding: 6px 12px;
-            background-color: #10b981;
-            font-size: 0.8rem;
-        }
+        .quick-add-buttons { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+        .quick-add-buttons button { width: auto; padding: 6px 12px; background-color: #10b981; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
         <h1>📦 ScanStock</h1>
-        <div class="sub">手机/电脑通用版 · 扫码出入库/盘点</div>
-
-        <!-- 服务器设置 -->
         <details>
             <summary style="cursor:pointer; margin-bottom:12px;">⚙️ 服务器设置</summary>
             <div class="input-group">
@@ -214,7 +61,6 @@
             </div>
         </details>
 
-        <!-- 当前分类选择器 -->
         <div class="category-selector">
             <label>📁 当前管理分类：</label>
             <select id="currentCategorySelect">
@@ -222,10 +68,9 @@
                 <option value="耗材">耗材</option>
                 <option value="物品">物品</option>
             </select>
-            <button id="refreshByCategoryBtn" class="btn-outline" style="background-color:#e5e7eb;">切换</button>
+            <button id="refreshByCategoryBtn" class="btn-outline">切换</button>
         </div>
 
-        <!-- 导入导出工具栏 -->
         <div class="toolbar">
             <button id="exportBtn" class="export">📎 导出 Excel（当前分类）</button>
             <button id="importBtn" class="import">📂 导入 Excel（当前分类）</button>
@@ -233,55 +78,37 @@
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
         </div>
 
-        <!-- 条码输入 -->
         <div class="input-group">
             <label>📷 条码 / 手动输入</label>
             <input type="text" id="barcodeInput" placeholder="扫描或输入条码（可跨分类查询）" autocomplete="off">
             <button id="scanBtn" style="margin-top:8px;">📷 模拟扫码</button>
-            <p class="sub">支持跨分类查询商品，但入库/出库/盘点会更新到当前分类的商品（若条码存在且分类不同，会提示）。</p>
+            <p class="sub" style="margin-top:6px;">支持跨分类查询，但入库/出库/盘点仅影响当前分类的商品。</p>
         </div>
 
-        <!-- 操作按钮组 -->
         <div class="flex-row">
             <button id="inboundBtn">📥 入库 +</button>
             <button id="outboundBtn">📤 出库 -</button>
             <button id="checkBtn">🔍 盘点</button>
         </div>
 
-        <div class="input-group" style="margin-top:12px;">
-            <label>数量</label>
-            <input type="number" id="quantityInput" value="1" step="1" min="1">
-        </div>
-        <div class="input-group" id="checkQuantityGroup" style="display:none;">
-            <label>📊 实际盘点数量</label>
-            <input type="number" id="actualQuantityInput" value="0" step="1">
-        </div>
-        <div class="input-group">
-            <label>备注（可选）</label>
-            <input type="text" id="reasonInput" placeholder="例如：补货、领用、盘点调整">
-        </div>
-
+        <div class="input-group"><label>数量</label><input type="number" id="quantityInput" value="1" step="1" min="1"></div>
+        <div class="input-group" id="checkQuantityGroup" style="display:none;"><label>📊 实际盘点数量</label><input type="number" id="actualQuantityInput" value="0" step="1"></div>
+        <div class="input-group"><label>备注（可选）</label><input type="text" id="reasonInput" placeholder="例如：补货、领用、盘点调整"></div>
         <div id="resultArea" class="result-area">等待操作...</div>
     </div>
 
-    <!-- 商品信息卡片 -->
     <div class="card" id="productInfoCard" style="display:none;">
-        <div style="display: flex; justify-content: space-between;">
-            <strong>📄 商品信息</strong>
-            <span class="badge" id="productCategoryBadge"></span>
-        </div>
+        <div style="display:flex; justify-content:space-between;"><strong>📄 商品信息</strong><span class="badge" id="productCategoryBadge"></span></div>
         <div id="productDetail"></div>
-        <hr>
-        <div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
-        <div style="margin-top:8px; font-size:0.8rem; color:#6b7280;">提示：入库/出库/盘点操作仅针对当前分类，若条码分类不符会提醒。</div>
+        <div id="customFieldsDisplay" style="margin-top:8px; border-top:1px solid #eee; padding-top:8px;"></div>
+        <hr><div><strong>当前库存:</strong> <span id="productQuantity">-</span></div>
     </div>
 
-    <!-- 库存表格（仅显示当前分类） -->
-    <div class="card" id="stockTableCard">
+    <div class="card">
         <strong>📋 当前库存列表（仅显示 <span id="currentCategoryLabel">试剂</span>）</strong>
         <div class="table-wrapper">
             <table id="stockTable">
-                <thead><tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th></thead>
+                <thead id="stockTableHead"></thead>
                 <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tr></tbody>
             </table>
         </div>
@@ -289,7 +116,7 @@
     </div>
 </div>
 
-<!-- 字段配置模态框（同之前，但默认分类取自当前分类） -->
+<!-- 字段配置模态框 -->
 <div id="configModal" class="modal">
     <div class="modal-content">
         <h3>⚙️ 自定义字段配置（当前分类：<span id="configModalCategoryDisplay"></span>）</h3>
@@ -298,27 +125,25 @@
             <button id="downloadTemplateBtn" style="background-color:#6b7280; width:auto;">📥 下载模板</button>
         </div>
         <div class="quick-add-buttons">
-            <span style="font-size:0.9rem; align-self:center;">快捷添加常用字段：</span>
-            <button type="button" data-fields="有效期,date|批号,text|保存温度,number">试剂常用</button>
-            <button type="button" data-fields="规格,text|单位,text|供应商,text">耗材常用</button>
-            <button type="button" data-fields="品牌,text|保修期,date|备注,text">物品常用</button>
+            <span style="font-size:0.9rem; align-self:center;">快捷添加：</span>
+            <button data-fields="有效期,date|批号,text|保存温度,number">试剂常用</button>
+            <button data-fields="规格,text|单位,text|供应商,text">耗材常用</button>
+            <button data-fields="品牌,text|保修期,date|备注,text">物品常用</button>
         </div>
-        <div id="fieldListContainer">
-            <table class="field-table">
-                <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th style="width:100px;">排序</th><th>操作</th></tr></thead>
-                <tbody id="fieldTableBody"></tbody>
-            </table>
-        </div>
+        <table class="field-table">
+            <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>列表显示</th><th>排序</th><th>操作</th></tr></thead>
+            <tbody id="fieldTableBody"></tbody>
+        </table>
         <button id="addFieldRowBtn" style="background-color:#6b7280; margin-top:8px; width:auto;">+ 添加字段</button>
         <div class="modal-actions">
-            <button id="saveFieldsBtn" style="background-color:#10b981; width:auto;">保存配置（仅当前分类）</button>
+            <button id="saveFieldsBtn" style="background-color:#10b981; width:auto;">保存配置</button>
             <button id="closeModalBtn" style="background-color:#9ca3af; width:auto;">关闭</button>
         </div>
     </div>
 </div>
 
 <script>
-    // ==================== DOM 元素绑定 ====================
+    // DOM 元素
     const apiBaseUrlInput = document.getElementById('apiBaseUrl');
     const saveServerBtn = document.getElementById('saveServerBtn');
     const barcodeInput = document.getElementById('barcodeInput');
@@ -335,42 +160,22 @@
     const productQuantitySpan = document.getElementById('productQuantity');
     const productCategoryBadge = document.getElementById('productCategoryBadge');
     const checkQuantityGroup = document.getElementById('checkQuantityGroup');
+    const stockTableHead = document.getElementById('stockTableHead');
     const stockTableBody = document.getElementById('stockTableBody');
     const refreshTableBtn = document.getElementById('refreshTableBtn');
     const currentCategorySelect = document.getElementById('currentCategorySelect');
     const refreshByCategoryBtn = document.getElementById('refreshByCategoryBtn');
     const currentCategoryLabelSpan = document.getElementById('currentCategoryLabel');
+    const customFieldsDisplayDiv = document.getElementById('customFieldsDisplay');
 
     let currentMode = 'inbound';
-    let currentProduct = null;
     let serverBase = localStorage.getItem('apiBaseUrl') || apiBaseUrlInput.value;
     if (serverBase) apiBaseUrlInput.value = serverBase;
-
-    // 当前分类（从 localStorage 读取或默认试剂）
     let currentCategory = localStorage.getItem('currentCategory') || '试剂';
     currentCategorySelect.value = currentCategory;
     currentCategoryLabelSpan.innerText = currentCategory;
 
-    // 保存当前分类并刷新列表
-    function setCurrentCategory(cat) {
-        currentCategory = cat;
-        localStorage.setItem('currentCategory', currentCategory);
-        currentCategoryLabelSpan.innerText = currentCategory;
-        loadStockTable();
-    }
-
-    refreshByCategoryBtn.onclick = () => {
-        const newCat = currentCategorySelect.value;
-        if (newCat !== currentCategory) {
-            setCurrentCategory(newCat);
-            // 可选：清除当前扫码的商品信息，避免混淆
-            productInfoCard.style.display = 'none';
-            barcodeInput.value = '';
-            showResult(`已切换到分类：${newCat}`, 'success');
-        }
-    };
-
-    // ==================== 通用函数 ====================
+    // 保存服务器地址
     function saveServerUrl() {
         let url = apiBaseUrlInput.value.trim();
         if (!url) return;
@@ -388,29 +193,43 @@
         }, 3000);
     }
 
-    async function fetchProduct(barcode) {
-        if (!serverBase) throw new Error('请先保存服务器地址');
-        // 获取所有商品（不分分类）以便跨分类查询
+    async function fetchAllProducts() {
         const res = await fetch(`${serverBase}/api/products`);
-        if (!res.ok) throw new Error('获取商品列表失败');
-        const products = await res.json();
+        if (!res.ok) throw new Error('获取商品失败');
+        return await res.json();
+    }
+
+    async function fetchProductByBarcode(barcode) {
+        const products = await fetchAllProducts();
         return products.find(p => p.barcode === barcode);
+    }
+
+    async function fetchFieldConfigs(category) {
+        const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`);
+        if (!res.ok) return [];
+        return await res.json();
     }
 
     async function updateProductInfo(barcode) {
         if (!barcode) { productInfoCard.style.display = 'none'; return; }
         try {
-            const product = await fetchProduct(barcode);
+            const product = await fetchProductByBarcode(barcode);
             if (product) {
-                currentProduct = product;
-                productDetail.innerHTML = `
-                    <div><strong>名称:</strong> ${escapeHtml(product.name)}</div>
-                    <div><strong>条码:</strong> ${escapeHtml(product.barcode)}</div>
-                    <div><strong>分类:</strong> ${escapeHtml(product.category)}</div>
-                    <div><strong>位置:</strong> ${escapeHtml(product.location || '未设置')}</div>
-                `;
+                productDetail.innerHTML = `<div><strong>名称:</strong> ${escapeHtml(product.name)}</div><div><strong>条码:</strong> ${escapeHtml(product.barcode)}</div><div><strong>分类:</strong> ${escapeHtml(product.category)}</div><div><strong>位置:</strong> ${escapeHtml(product.location||'未设置')}</div>`;
                 productQuantitySpan.innerText = product.quantity;
                 productCategoryBadge.innerText = product.category;
+                // 加载当前分类的字段（仅列表显示的）
+                const fields = await fetchFieldConfigs(currentCategory);
+                const visibleFields = fields.filter(f => f.show_in_list);
+                let customHtml = '';
+                if (visibleFields.length) {
+                    const custom = JSON.parse(product.custom_fields || '{}');
+                    for (const f of visibleFields) {
+                        const val = custom[f.field_name] || '';
+                        customHtml += `<div><strong>${escapeHtml(f.display_name)}:</strong> ${escapeHtml(val)}</div>`;
+                    }
+                }
+                customFieldsDisplayDiv.innerHTML = customHtml;
                 productInfoCard.style.display = 'block';
             } else {
                 productInfoCard.style.display = 'none';
@@ -448,15 +267,10 @@
         const barcode = barcodeInput.value.trim();
         if (!barcode) { showResult('请输入或扫描条码', 'error'); return; }
         const reason = reasonInput.value.trim();
-        // 首先获取商品信息，检查分类是否匹配当前分类（可选警告）
         let product = null;
-        try {
-            product = await fetchProduct(barcode);
-        } catch(e) {}
+        try { product = await fetchProductByBarcode(barcode); } catch(e) {}
         if (product && product.category !== currentCategory) {
-            if (!confirm(`商品「${product.name}」属于分类「${product.category}」，当前管理分类是「${currentCategory}」。\n是否继续操作？操作后商品分类不会自动改变。`)) {
-                return;
-            }
+            if (!confirm(`商品「${product.name}」属于分类「${product.category}」，当前管理分类是「${currentCategory}」。是否继续操作？`)) return;
         }
         let endpoint = '', body = { barcode, reason };
         if (currentMode === 'inbound') {
@@ -491,7 +305,7 @@
             else if (currentMode === 'outbound') msg = `✅ 出库成功，新库存: ${data.new_quantity}`;
             else if (currentMode === 'check') msg = `✅ 盘点记录已保存，差异: ${data.diff}`;
             showResult(msg, 'success');
-            loadStockTable(); // 刷新当前分类的库存列表
+            loadStockTable();
         } catch (err) {
             showResult(`❌ 错误: ${err.message}`, 'error');
         }
@@ -508,29 +322,42 @@
     async function loadStockTable() {
         if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
         try {
-            const url = `${serverBase}/api/products?category=${encodeURIComponent(currentCategory)}`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const products = await res.json();
-            if (products.length === 0) { stockTableBody.innerHTML = '<tr><td colspan="5">暂无商品数据</td></tr>'; return; }
-            let html = '';
+            const productsRes = await fetch(`${serverBase}/api/products?category=${encodeURIComponent(currentCategory)}`);
+            const products = await productsRes.json();
+            const fields = await fetchFieldConfigs(currentCategory);
+            const visibleFields = fields.filter(f => f.show_in_list);
+            // 构建表头
+            let theadHtml = '<tr><th>条码</th><th>名称</th><th>分类</th><th>数量</th><th>位置</th>';
+            for (const f of visibleFields) {
+                theadHtml += `<th>${escapeHtml(f.display_name)}</th>`;
+            }
+            theadHtml += '</tr>';
+            stockTableHead.innerHTML = theadHtml;
+            // 构建行
+            let tbodyHtml = '';
             for (const p of products) {
-                html += `<tr>
+                const custom = JSON.parse(p.custom_fields || '{}');
+                tbodyHtml += `<tr>
                     <td>${escapeHtml(p.barcode)}</td>
                     <td>${escapeHtml(p.name)}</td>
                     <td>${escapeHtml(p.category)}</td>
                     <td>${p.quantity}</td>
-                    <td>${escapeHtml(p.location || '-')}</td>
-                </tr>`;
+                    <td>${escapeHtml(p.location || '-')}</td>`;
+                for (const f of visibleFields) {
+                    const val = custom[f.field_name] || '';
+                    tbodyHtml += `<td>${escapeHtml(val)}</td>`;
+                }
+                tbodyHtml += '</tr>';
             }
-            stockTableBody.innerHTML = html;
+            stockTableBody.innerHTML = tbodyHtml;
         } catch (err) {
             stockTableBody.innerHTML = `<tr><td colspan="5">加载失败: ${err.message}</td></tr>`;
         }
     }
+
     refreshTableBtn.onclick = loadStockTable;
 
-    // 导入导出（基于当前分类）
+    // 导入导出
     const exportBtn = document.getElementById('exportBtn');
     const importBtn = document.getElementById('importBtn');
     const excelFileInput = document.getElementById('excelFileInput');
@@ -544,7 +371,6 @@
         if (!file) return;
         const formData = new FormData();
         formData.append('file', file);
-        // 导入时也传递当前分类作为默认分类
         let url = `${serverBase}/api/import/excel`;
         if (currentCategory) url += `?category=${encodeURIComponent(currentCategory)}`;
         try {
@@ -573,7 +399,7 @@
         });
     }
 
-    // ==================== 字段配置模态框（基于当前分类） ====================
+    // 字段配置模态框
     const configModal = document.getElementById('configModal');
     const configFieldsBtn = document.getElementById('configFieldsBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
@@ -585,10 +411,7 @@
     const configModalCategoryDisplay = document.getElementById('configModalCategoryDisplay');
 
     configFieldsBtn.onclick = () => {
-        if (!serverBase) {
-            alert('请先保存服务器地址');
-            return;
-        }
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
         configModalCategoryDisplay.innerText = currentCategory;
         configModal.style.display = 'block';
         loadFieldsForCategory(currentCategory);
@@ -601,65 +424,15 @@
     };
 
     async function loadFieldsForCategory(category) {
-        if (!serverBase) {
-            fieldTableBody.innerHTML = '<tr><td colspan="5">请先保存服务器地址</td></tr>';
-            return;
-        }
-        fieldTableBody.innerHTML = '<tr><td colspan="5">加载中...</td></tr>';
+        if (!serverBase) { fieldTableBody.innerHTML = '<tr><td colspan="6">请先保存服务器地址</td></tr>'; return; }
+        fieldTableBody.innerHTML = '<tr><td colspan="6">加载中...</td></tr>';
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`, {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
+            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const configs = await res.json();
             renderFieldTable(configs);
         } catch (err) {
-            let msg = err.message;
-            if (err.name === 'AbortError') msg = '请求超时';
-            fieldTableBody.innerHTML = `<tr><td colspan="5" style="color:red;">加载失败: ${msg}</td></tr>`;
-        }
-    }
-
-    function getCurrentDisplayNames() {
-        const names = [];
-        for (let i = 0; i < fieldTableBody.rows.length; i++) {
-            const row = fieldTableBody.rows[i];
-            if (row.cells.length !== 5) continue;
-            const displayNameInput = row.cells[0].querySelector('input');
-            if (displayNameInput && displayNameInput.value.trim()) {
-                names.push(displayNameInput.value.trim());
-            }
-        }
-        return names;
-    }
-
-    function checkDuplicateNames() {
-        const names = getCurrentDisplayNames();
-        const seen = new Map();
-        for (let i = 0; i < fieldTableBody.rows.length; i++) {
-            const row = fieldTableBody.rows[i];
-            if (row.cells.length !== 5) continue;
-            const displayNameInput = row.cells[0].querySelector('input');
-            if (!displayNameInput) continue;
-            const val = displayNameInput.value.trim();
-            let warningSpan = row._warningSpan;
-            if (!warningSpan) {
-                warningSpan = document.createElement('span');
-                warningSpan.className = 'duplicate-warning';
-                displayNameInput.parentNode.appendChild(warningSpan);
-                row._warningSpan = warningSpan;
-            }
-            if (val && seen.has(val)) {
-                warningSpan.textContent = '⚠️ 重复';
-                warningSpan.style.display = 'inline';
-            } else {
-                warningSpan.textContent = '';
-                warningSpan.style.display = 'none';
-            }
-            if (val) seen.set(val, true);
+            fieldTableBody.innerHTML = `<tr><td colspan="6" style="color:red;">加载失败: ${err.message}</td></tr>`;
         }
     }
 
@@ -668,14 +441,14 @@
         if (!configs || configs.length === 0) {
             const row = fieldTableBody.insertRow();
             const cell = row.insertCell(0);
-            cell.colSpan = 5;
+            cell.colSpan = 6;
             cell.textContent = '暂无自定义字段，点击"添加字段"添加';
             cell.style.textAlign = 'center';
             return;
         }
-        for (let idx = 0; idx < configs.length; idx++) {
-            const cfg = configs[idx];
+        for (const cfg of configs) {
             const row = fieldTableBody.insertRow();
+            // 显示名称
             const cell0 = row.insertCell(0);
             const displayNameInput = document.createElement('input');
             displayNameInput.value = cfg.display_name;
@@ -683,6 +456,7 @@
             displayNameInput.style.width = '100%';
             displayNameInput.addEventListener('input', () => checkDuplicateNames());
             cell0.appendChild(displayNameInput);
+            // 类型
             const cell1 = row.insertCell(1);
             const typeSelect = document.createElement('select');
             ['text', 'number', 'date'].forEach(t => {
@@ -693,12 +467,20 @@
                 typeSelect.appendChild(opt);
             });
             cell1.appendChild(typeSelect);
+            // 必填
             const cell2 = row.insertCell(2);
-            const chk = document.createElement('input');
-            chk.type = 'checkbox';
-            chk.checked = cfg.is_required === true;
-            cell2.appendChild(chk);
+            const chkRequired = document.createElement('input');
+            chkRequired.type = 'checkbox';
+            chkRequired.checked = cfg.is_required;
+            cell2.appendChild(chkRequired);
+            // 列表显示
             const cell3 = row.insertCell(3);
+            const chkShow = document.createElement('input');
+            chkShow.type = 'checkbox';
+            chkShow.checked = cfg.show_in_list;
+            cell3.appendChild(chkShow);
+            // 排序按钮
+            const cell4 = row.insertCell(4);
             const upBtn = document.createElement('button');
             upBtn.textContent = '↑';
             upBtn.className = 'move-btn';
@@ -707,36 +489,69 @@
             downBtn.textContent = '↓';
             downBtn.className = 'move-btn';
             downBtn.onclick = () => moveRow(row, 1);
-            cell3.appendChild(upBtn);
-            cell3.appendChild(downBtn);
-            const cell4 = row.insertCell(4);
+            cell4.appendChild(upBtn);
+            cell4.appendChild(downBtn);
+            // 删除
+            const cell5 = row.insertCell(5);
             const delBtn = document.createElement('button');
             delBtn.textContent = '删除';
             delBtn.className = 'delete-btn';
             delBtn.style.backgroundColor = '#ef4444';
-            delBtn.onclick = () => {
-                row.remove();
-                checkDuplicateNames();
-            };
-            cell4.appendChild(delBtn);
-            row._data = { displayNameInput, typeSelect, chk };
+            delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
+            cell5.appendChild(delBtn);
+            // 存储引用
+            row._data = { displayNameInput, typeSelect, chkRequired, chkShow };
         }
         checkDuplicateNames();
     }
 
-    function moveRow(row, direction) {
-        const index = row.rowIndex;
-        const newIndex = index + direction;
-        if (newIndex < 0 || newIndex >= fieldTableBody.rows.length) return;
-        const parent = row.parentNode;
-        if (direction === -1) {
-            parent.insertBefore(row, parent.rows[newIndex]);
-        } else {
-            if (newIndex < parent.rows.length - 1) {
-                parent.insertBefore(row, parent.rows[newIndex + 1]);
-            } else {
-                parent.appendChild(row);
+    function getCurrentDisplayNames() {
+        const names = [];
+        for (let i = 0; i < fieldTableBody.rows.length; i++) {
+            const row = fieldTableBody.rows[i];
+            if (row.cells.length !== 6) continue;
+            const inp = row.cells[0].querySelector('input');
+            if (inp && inp.value.trim()) names.push(inp.value.trim());
+        }
+        return names;
+    }
+
+    function checkDuplicateNames() {
+        const names = getCurrentDisplayNames();
+        const seen = new Map();
+        for (let i = 0; i < fieldTableBody.rows.length; i++) {
+            const row = fieldTableBody.rows[i];
+            if (row.cells.length !== 6) continue;
+            const inp = row.cells[0].querySelector('input');
+            if (!inp) continue;
+            const val = inp.value.trim();
+            let warnSpan = row._warningSpan;
+            if (!warnSpan) {
+                warnSpan = document.createElement('span');
+                warnSpan.className = 'duplicate-warning';
+                inp.parentNode.appendChild(warnSpan);
+                row._warningSpan = warnSpan;
             }
+            if (val && seen.has(val)) {
+                warnSpan.textContent = '⚠️ 重复';
+                warnSpan.style.display = 'inline';
+            } else {
+                warnSpan.textContent = '';
+                warnSpan.style.display = 'none';
+            }
+            if (val) seen.set(val, true);
+        }
+    }
+
+    function moveRow(row, dir) {
+        const idx = row.rowIndex;
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= fieldTableBody.rows.length) return;
+        const parent = row.parentNode;
+        if (dir === -1) parent.insertBefore(row, parent.rows[newIdx]);
+        else {
+            if (newIdx < parent.rows.length - 1) parent.insertBefore(row, parent.rows[newIdx+1]);
+            else parent.appendChild(row);
         }
         checkDuplicateNames();
     }
@@ -744,79 +559,62 @@
     addFieldRowBtn.onclick = () => {
         const row = fieldTableBody.insertRow();
         const cell0 = row.insertCell(0);
-        const displayNameInput = document.createElement('input');
-        displayNameInput.placeholder = '显示名称';
-        displayNameInput.style.width = '100%';
-        displayNameInput.addEventListener('input', () => checkDuplicateNames());
-        cell0.appendChild(displayNameInput);
+        const inpName = document.createElement('input');
+        inpName.placeholder = '显示名称';
+        inpName.style.width = '100%';
+        inpName.addEventListener('input', () => checkDuplicateNames());
+        cell0.appendChild(inpName);
         const cell1 = row.insertCell(1);
-        const typeSelect = document.createElement('select');
-        ['text', 'number', 'date'].forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
-            typeSelect.appendChild(opt);
-        });
-        cell1.appendChild(typeSelect);
+        const typeSel = document.createElement('select');
+        ['text','number','date'].forEach(t => typeSel.appendChild(new Option(t,t)));
+        cell1.appendChild(typeSel);
         const cell2 = row.insertCell(2);
-        const chk = document.createElement('input');
-        chk.type = 'checkbox';
-        cell2.appendChild(chk);
+        const chkReq = document.createElement('input');
+        chkReq.type = 'checkbox';
+        cell2.appendChild(chkReq);
         const cell3 = row.insertCell(3);
-        const upBtn = document.createElement('button');
-        upBtn.textContent = '↑';
-        upBtn.className = 'move-btn';
-        upBtn.onclick = () => moveRow(row, -1);
-        const downBtn = document.createElement('button');
-        downBtn.textContent = '↓';
-        downBtn.className = 'move-btn';
-        downBtn.onclick = () => moveRow(row, 1);
-        cell3.appendChild(upBtn);
-        cell3.appendChild(downBtn);
+        const chkShow = document.createElement('input');
+        chkShow.type = 'checkbox';
+        cell3.appendChild(chkShow);
         const cell4 = row.insertCell(4);
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '删除';
-        delBtn.className = 'delete-btn';
-        delBtn.style.backgroundColor = '#ef4444';
-        delBtn.onclick = () => {
-            row.remove();
-            checkDuplicateNames();
-        };
-        cell4.appendChild(delBtn);
-        row._data = { displayNameInput, typeSelect, chk };
+        const upBtn = document.createElement('button'); upBtn.textContent='↑'; upBtn.className='move-btn'; upBtn.onclick=()=>moveRow(row,-1);
+        const downBtn = document.createElement('button'); downBtn.textContent='↓'; downBtn.className='move-btn'; downBtn.onclick=()=>moveRow(row,1);
+        cell4.appendChild(upBtn); cell4.appendChild(downBtn);
+        const cell5 = row.insertCell(5);
+        const delBtn = document.createElement('button'); delBtn.textContent='删除'; delBtn.className='delete-btn'; delBtn.style.backgroundColor='#ef4444';
+        delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
+        cell5.appendChild(delBtn);
+        row._data = { displayNameInput: inpName, typeSelect: typeSel, chkRequired: chkReq, chkShow: chkShow };
         checkDuplicateNames();
     };
 
     saveFieldsBtn.onclick = async () => {
-        const category = currentCategory; // 使用当前分类
         const rows = fieldTableBody.querySelectorAll('tr');
         const configs = [];
         let hasError = false;
         for (const row of rows) {
-            if (row.cells.length !== 5) continue;
+            if (row.cells.length !== 6) continue;
             const displayName = row.cells[0].querySelector('input')?.value.trim();
             if (!displayName) continue;
-            const dup = row.querySelector('.duplicate-warning')?.textContent.includes('重复');
-            if (dup) {
+            if (row.querySelector('.duplicate-warning')?.textContent.includes('重复')) {
                 alert(`显示名称“${displayName}”重复，请修改后再保存`);
                 hasError = true;
                 break;
             }
             const fieldType = row.cells[1].querySelector('select')?.value || 'text';
             const isRequired = row.cells[2].querySelector('input')?.checked || false;
+            const showInList = row.cells[3].querySelector('input')?.checked || false;
             configs.push({
                 display_name: displayName,
                 field_type: fieldType,
-                is_required: isRequired
+                is_required: isRequired,
+                show_in_list: showInList
             });
         }
         if (hasError) return;
-        if (!serverBase) {
-            alert('请先保存服务器地址');
-            return;
-        }
+        if (!serverBase) { alert('请先保存服务器地址'); return; }
         try {
-            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(category)}`, {
+            const res = await fetch(`${serverBase}/api/field_configs/${encodeURIComponent(currentCategory)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(configs)
@@ -825,8 +623,7 @@
             const result = await res.json();
             alert(result.message);
             configModal.style.display = 'none';
-            // 保存后建议刷新库存列表（虽然字段不影响库存列表显示，但为了后续导出）
-            loadStockTable();
+            loadStockTable(); // 刷新列表（可能列数变化）
         } catch (err) {
             alert('保存失败：' + err.message);
         }
@@ -834,9 +631,8 @@
 
     loadFieldsBtn.onclick = () => loadFieldsForCategory(currentCategory);
 
-    // 快捷添加常用字段
-    const quickAddBtns = document.querySelectorAll('.quick-add-buttons button');
-    quickAddBtns.forEach(btn => {
+    // 快捷添加
+    document.querySelectorAll('.quick-add-buttons button').forEach(btn => {
         btn.addEventListener('click', () => {
             const fieldsStr = btn.getAttribute('data-fields');
             if (!fieldsStr) return;
@@ -851,16 +647,13 @@
                 }
                 addFieldRowBtn.click();
                 const newRow = fieldTableBody.lastElementChild;
-                if (newRow && newRow.cells.length === 5) {
+                if (newRow && newRow.cells.length === 6) {
                     const nameInput = newRow.cells[0].querySelector('input');
                     if (nameInput) nameInput.value = name;
                     const typeSelect = newRow.cells[1].querySelector('select');
                     if (typeSelect && type) {
-                        for (let i = 0; i < typeSelect.options.length; i++) {
-                            if (typeSelect.options[i].value === type) {
-                                typeSelect.selectedIndex = i;
-                                break;
-                            }
+                        for (let i=0; i<typeSelect.options.length; i++) {
+                            if (typeSelect.options[i].value === type) { typeSelect.selectedIndex = i; break; }
                         }
                     }
                 }
@@ -869,6 +662,20 @@
             checkDuplicateNames();
         });
     });
+
+    // 切换分类
+    refreshByCategoryBtn.onclick = () => {
+        const newCat = currentCategorySelect.value;
+        if (newCat !== currentCategory) {
+            currentCategory = newCat;
+            localStorage.setItem('currentCategory', currentCategory);
+            currentCategoryLabelSpan.innerText = currentCategory;
+            loadStockTable();
+            productInfoCard.style.display = 'none';
+            barcodeInput.value = '';
+            showResult(`已切换到分类：${currentCategory}`, 'success');
+        }
+    };
 
     // 初始化
     loadStockTable();
