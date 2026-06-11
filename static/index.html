@@ -109,7 +109,7 @@
         <div class="table-wrapper">
             <table id="stockTable">
                 <thead id="stockTableHead"></thead>
-                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tr></tbody>
+                <tbody id="stockTableBody"><tr><td colspan="5">加载中...</tbody>
             </table>
         </div>
         <button id="refreshTableBtn" style="margin-top:12px; background-color:#6b7280;">🔄 刷新列表</button>
@@ -131,7 +131,7 @@
             <button data-fields="品牌,text|保修期,date|备注,text">物品常用</button>
         </div>
         <table class="field-table">
-            <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>列表显示</th><th>排序</th><th>操作</th></tr></thead>
+            <thead><tr><th>显示名称</th><th>类型</th><th>必填</th><th>列表显示</th><th>排序</th><th>操作</th></thead>
             <tbody id="fieldTableBody"></tbody>
         </table>
         <button id="addFieldRowBtn" style="background-color:#6b7280; margin-top:8px; width:auto;">+ 添加字段</button>
@@ -175,7 +175,6 @@
     currentCategorySelect.value = currentCategory;
     currentCategoryLabelSpan.innerText = currentCategory;
 
-    // 保存服务器地址
     function saveServerUrl() {
         let url = apiBaseUrlInput.value.trim();
         if (!url) return;
@@ -188,9 +187,7 @@
 
     function showResult(msg, type) {
         resultArea.innerHTML = `<div style="color:${type === 'error' ? 'red' : 'green'}">${msg}</div>`;
-        setTimeout(() => {
-            if (resultArea.innerHTML.includes(msg)) resultArea.innerHTML = '等待操作...';
-        }, 3000);
+        setTimeout(() => { if (resultArea.innerHTML.includes(msg)) resultArea.innerHTML = '等待操作...'; }, 3000);
     }
 
     async function fetchAllProducts() {
@@ -320,7 +317,7 @@
     document.querySelector('.card').insertBefore(actionBtn, document.getElementById('resultArea'));
 
     async function loadStockTable() {
-        if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td></tr>'; return; }
+        if (!serverBase) { stockTableBody.innerHTML = '<tr><td colspan="5">请先设置服务器地址</td>'; return; }
         try {
             const productsRes = await fetch(`${serverBase}/api/products?category=${encodeURIComponent(currentCategory)}`);
             const products = await productsRes.json();
@@ -484,11 +481,11 @@
             const upBtn = document.createElement('button');
             upBtn.textContent = '↑';
             upBtn.className = 'move-btn';
-            upBtn.onclick = () => moveRow(row, -1);
+            upBtn.onclick = (function(r) { return function() { moveRow(r, -1); }; })(row);
             const downBtn = document.createElement('button');
             downBtn.textContent = '↓';
             downBtn.className = 'move-btn';
-            downBtn.onclick = () => moveRow(row, 1);
+            downBtn.onclick = (function(r) { return function() { moveRow(r, 1); }; })(row);
             cell4.appendChild(upBtn);
             cell4.appendChild(downBtn);
             // 删除
@@ -497,7 +494,7 @@
             delBtn.textContent = '删除';
             delBtn.className = 'delete-btn';
             delBtn.style.backgroundColor = '#ef4444';
-            delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
+            delBtn.onclick = (function(r) { return function() { r.remove(); checkDuplicateNames(); }; })(row);
             cell5.appendChild(delBtn);
             // 存储引用
             row._data = { displayNameInput, typeSelect, chkRequired, chkShow };
@@ -544,14 +541,15 @@
     }
 
     function moveRow(row, dir) {
-        const idx = row.rowIndex;
-        const newIdx = idx + dir;
-        if (newIdx < 0 || newIdx >= fieldTableBody.rows.length) return;
         const parent = row.parentNode;
-        if (dir === -1) parent.insertBefore(row, parent.rows[newIdx]);
-        else {
-            if (newIdx < parent.rows.length - 1) parent.insertBefore(row, parent.rows[newIdx+1]);
-            else parent.appendChild(row);
+        const rows = Array.from(parent.children);
+        const idx = rows.indexOf(row);
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= rows.length) return;
+        if (dir === -1) {
+            parent.insertBefore(row, rows[newIdx]);
+        } else {
+            parent.insertBefore(row, rows[newIdx + 1]);
         }
         checkDuplicateNames();
     }
@@ -577,12 +575,12 @@
         chkShow.type = 'checkbox';
         cell3.appendChild(chkShow);
         const cell4 = row.insertCell(4);
-        const upBtn = document.createElement('button'); upBtn.textContent='↑'; upBtn.className='move-btn'; upBtn.onclick=()=>moveRow(row,-1);
-        const downBtn = document.createElement('button'); downBtn.textContent='↓'; downBtn.className='move-btn'; downBtn.onclick=()=>moveRow(row,1);
+        const upBtn = document.createElement('button'); upBtn.textContent='↑'; upBtn.className='move-btn'; upBtn.onclick = (function(r){ return function(){ moveRow(r, -1); }; })(row);
+        const downBtn = document.createElement('button'); downBtn.textContent='↓'; downBtn.className='move-btn'; downBtn.onclick = (function(r){ return function(){ moveRow(r, 1); }; })(row);
         cell4.appendChild(upBtn); cell4.appendChild(downBtn);
         const cell5 = row.insertCell(5);
         const delBtn = document.createElement('button'); delBtn.textContent='删除'; delBtn.className='delete-btn'; delBtn.style.backgroundColor='#ef4444';
-        delBtn.onclick = () => { row.remove(); checkDuplicateNames(); };
+        delBtn.onclick = (function(r){ return function(){ r.remove(); checkDuplicateNames(); }; })(row);
         cell5.appendChild(delBtn);
         row._data = { displayNameInput: inpName, typeSelect: typeSel, chkRequired: chkReq, chkShow: chkShow };
         checkDuplicateNames();
@@ -623,7 +621,12 @@
             const result = await res.json();
             alert(result.message);
             configModal.style.display = 'none';
-            loadStockTable(); // 刷新列表（可能列数变化）
+            // 刷新库存列表以反映最新的列表显示设置
+            await loadStockTable();
+            // 如果当前有显示商品卡片，也刷新一下
+            if (barcodeInput.value.trim()) {
+                await updateProductInfo(barcodeInput.value.trim());
+            }
         } catch (err) {
             alert('保存失败：' + err.message);
         }
